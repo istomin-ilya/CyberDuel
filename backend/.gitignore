@@ -1,0 +1,20 @@
+# Python compilation
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environment variables
+.env
+
+# UV / Virtual Environments
+.venv/
+venv/
+ENV/
+
+# IDE settings (optional but recommended)
+.vscode/
+.idea/
+
+# OS generated files
+.DS_Store
+Thumbs.db
