@@ -1,20 +1,30 @@
-# Python compilation
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
-
-# Environment variables
-.env
-
-# UV / Virtual Environments
-.venv/
+*.so
+.Python
+env/
 venv/
 ENV/
+*.egg-info/
+dist/
+build/
 
-# IDE settings (optional but recommended)
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Environment
+.env
+
+# IDE
 .vscode/
 .idea/
+*.swp
+*.swo
 
-# OS generated files
+# OS
 .DS_Store
 Thumbs.db
