@@ -2,16 +2,19 @@
 name = "cyberduel-backend"
 version = "0.1.0"
 description = "Backend service for CyberDuel Protocol - A peer-to-peer prediction market system"
-readme = "README.md"
 requires-python = ">=3.12"
 authors = [
     { name = "Ilya Istomin", email = "ilyaistom@gmail.com" }
 ]
 keywords = ["prediction-markets", "p2p", "esports", "fastapi"]
-
 dependencies = [
+    "alembic>=1.18.2",
     "fastapi>=0.128.0",
+    "passlib[argon2]>=1.7.4",
     "pydantic-settings>=2.12.0",
+    "pydantic[email]>=2.12.5",
+    "python-jose>=3.5.0",
+    "python-multipart>=0.0.22",
     "sqlalchemy>=2.0.46",
     "uvicorn[standard]>=0.40.0",
 ]
@@ -19,3 +22,6 @@ dependencies = [
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]

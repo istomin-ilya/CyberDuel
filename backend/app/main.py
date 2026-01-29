@@ -4,12 +4,12 @@ CyberDuel Protocol - Main application entry point.
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .config import settings
-from .database import init_db
+from .api import auth 
 
 # Create FastAPI application
 app = FastAPI(
     title=settings.APP_NAME,
-    description="A Decentralized Peer-to-Peer Prediction Market Protocol for Esports",
+    description="A Peer-to-Peer Prediction Market Protocol for Esports",
     version="0.1.0",
     debug=settings.DEBUG
 )
@@ -23,13 +23,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Include routers
+app.include_router(auth.router)
+
 
 @app.on_event("startup")
 async def startup_event():
-    """Initialize database on startup."""
-    init_db()
+    """Application startup."""
     print(f"{settings.APP_NAME} started")
     print(f"Database: {settings.DATABASE_URL}")
+    print("Run 'alembic upgrade head' to apply migrations")
 
 
 @app.on_event("shutdown")
