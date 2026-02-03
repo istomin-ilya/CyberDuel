@@ -15,6 +15,20 @@ from .order import (
     MatchOrderRequest,
     ContractResponse
 )
+from .event import (
+    EventCreate,
+    EventUpdate,
+    EventResponse,
+    EventListResponse
+)
+from .market import (
+    OutcomeCreate,
+    OutcomeResponse,
+    MarketCreate,
+    MarketUpdate,
+    MarketResponse,
+    MarketListResponse
+)
 
 __all__ = [
     "UserCreate",
@@ -27,4 +41,14 @@ __all__ = [
     "OrderListResponse",
     "MatchOrderRequest",
     "ContractResponse",
+    "EventCreate",
+    "EventUpdate",
+    "EventResponse",
+    "EventListResponse",
+    "OutcomeCreate",
+    "OutcomeResponse",
+    "MarketCreate",
+    "MarketUpdate",
+    "MarketResponse",
+    "MarketListResponse",
 ]
