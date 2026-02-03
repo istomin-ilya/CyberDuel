@@ -13,8 +13,19 @@ from ..models.user import User
 from ..models.order import Order, OrderStatus
 from ..models.market import Market
 from ..models.outcome import Outcome
-from ..schemas.orders import OrderCreate, OrderResponse, OrderListResponse
+from ..schemas.order import (
+    OrderCreate, 
+    OrderResponse, 
+    OrderListResponse,
+    MatchOrderRequest,
+    ContractResponse
+)
 from ..services.escrow import EscrowService, InsufficientFundsError
+from ..services.matching import (
+    MatchingService,
+    MatchingError,
+    OrderNotAvailableError
+)
 
 router = APIRouter(prefix="/api/orders", tags=["orders"])
 
@@ -192,3 +203,59 @@ def cancel_order(
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to cancel order: {str(e)}")
+
+
+@router.post("/{order_id}/match", response_model=ContractResponse, status_code=status.HTTP_201_CREATED)
+def match_order(
+    order_id: int,
+    match_data: MatchOrderRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Match an order (Taker takes liquidity from Maker)
+    
+    Flow:
+    1. Lock order with SELECT FOR UPDATE
+    2. Validate order is available
+    3. Calculate taker risk
+    4. Lock taker funds
+    5. Create contract
+    6. Update order unfilled_amount and status
+    
+    Example:
+        Order: Maker stakes $100 @ 1.8 odds on "NaVi"
+        Taker: wants to take $50
+        Taker risk: 50 * (1.8 - 1) = $40
+        Contract: maker_amount=$50, taker_risk=$40, odds=1.8
+        Order: unfilled_amount: 100 -> 50, status: OPEN -> PARTIALLY_FILLED
+    """
+    
+    try:
+        contract = MatchingService.match_order(
+            db=db,
+            order_id=order_id,
+            taker=current_user,
+            amount=match_data.amount
+        )
+        
+        db.commit()
+        db.refresh(contract)
+        
+        return contract
+    
+    except OrderNotAvailableError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+    
+    except InsufficientFundsError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+    
+    except MatchingError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+    
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to match order: {str(e)}")

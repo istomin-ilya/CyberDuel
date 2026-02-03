@@ -13,6 +13,7 @@ dependencies = [
     "passlib[argon2]>=1.7.4",
     "pydantic-settings>=2.12.0",
     "pydantic[email]>=2.12.5",
+    "pytest>=9.0.2",
     "python-jose>=3.5.0",
     "python-multipart>=0.0.22",
     "sqlalchemy>=2.0.46",

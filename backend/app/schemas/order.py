@@ -44,3 +44,36 @@ class OrderListResponse(BaseModel):
     """Schema for paginated order list"""
     orders: list[OrderResponse]
     total: int
+
+class MatchOrderRequest(BaseModel):
+    """Schema for matching an order (Taker takes liquidity)"""
+    amount: Decimal = Field(
+        gt=0,
+        decimal_places=2,
+        description="Amount Taker wants to take (can be partial)"
+    )
+
+
+class ContractResponse(BaseModel):
+    """Schema for contract API response"""
+    id: int
+    market_id: int
+    order_id: int
+    maker_id: int
+    taker_id: int
+    outcome_id: int
+    amount: Decimal  # Maker's stake in this contract
+    odds: Decimal
+    status: str  # ACTIVE, CLAIMED, SETTLED, DISPUTED
+    created_at: datetime
+    
+    # Optimistic Oracle fields
+    claim_initiated_by: Optional[int] = None
+    claim_initiated_at: Optional[datetime] = None
+    challenge_deadline: Optional[datetime] = None
+    
+    # Settlement fields
+    winner_id: Optional[int] = None
+    settled_at: Optional[datetime] = None
+    
+    model_config = ConfigDict(from_attributes=True)
