@@ -1,40 +1,35 @@
+# app/config.py
 """
 Application configuration.
-Uses environment variables with sensible defaults for development.
 """
-from pydantic_settings import BaseSettings
-from typing import Optional
+from pydantic import BaseSettings
 
 
 class Settings(BaseSettings):
-    """
-    Application settings.
-    
-    For development: uses SQLite by default
-    For production: set DATABASE_URL to PostgreSQL connection string
-    """
-    
-    # Application
-    APP_NAME: str = "CyberDuel Protocol"
-    DEBUG: bool = True
+    """Application settings loaded from environment variables"""
     
     # Database
-    # Default: SQLite for development
-    # Production: postgresql://user:password@localhost:5432/cyberduel
     DATABASE_URL: str = "sqlite:///./cyberduel.db"
     
     # Security
-    JWT_SECRET: str = "dev-secret-key-change-in-production"
-    JWT_ALGORITHM: str = "HS256"
+    SECRET_KEY: str = "your-secret-key-change-in-production"
+    ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     
     # CORS
-    CORS_ORIGINS: list[str] = ["http://localhost:3000", "http://localhost:5173"]
+    CORS_ORIGINS: list = ["http://localhost:3000", "http://localhost:5173"]
+    
+    # Oracle
+    ORACLE_PROVIDER: str = "mock"  # "mock" or "pandascore"
+    ORACLE_API_KEY: str = ""  # API key for external providers
+    ORACLE_POLL_INTERVAL_MINUTES: int = 5  # How often to check for results
+    
+    # Demo user
+    DEMO_INITIAL_BALANCE: float = 1000.00
     
     class Config:
         env_file = ".env"
-        env_file_encoding = "utf-8"
 
 
 settings = Settings()
