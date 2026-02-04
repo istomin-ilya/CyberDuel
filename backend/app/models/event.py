@@ -25,9 +25,9 @@ class EventStatus(str, Enum):
 
 class GameType(str, Enum):
     """Supported game types."""
-    CS2 = "cs2"
-    DOTA2 = "dota2"
-    LOL = "lol"
+    CS2 = "CS2"
+    DOTA2 = "DOTA2"
+    LOL = "LOL"
 
 
 class Event(Base, TimestampMixin):

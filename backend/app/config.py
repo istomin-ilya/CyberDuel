@@ -2,11 +2,17 @@
 """
 Application configuration.
 """
-from pydantic import BaseSettings
+from pydantic_settings import BaseSettings  # Changed from pydantic
+from pydantic import ConfigDict
 
 
 class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
+    
+    model_config = ConfigDict(env_file=".env")
+    
+    # Application
+    DEBUG: bool = False
     
     # Database
     DATABASE_URL: str = "sqlite:///./cyberduel.db"
@@ -27,9 +33,6 @@ class Settings(BaseSettings):
     
     # Demo user
     DEMO_INITIAL_BALANCE: float = 1000.00
-    
-    class Config:
-        env_file = ".env"
 
 
 settings = Settings()
