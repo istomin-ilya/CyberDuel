@@ -29,6 +29,14 @@ from .market import (
     MarketResponse,
     MarketListResponse
 )
+from .settlement import (
+    ClaimRequest,
+    ClaimResponse,
+    DisputeRequest,
+    DisputeResponse,
+    SettlementResponse,
+    ContractDetailResponse
+)
 
 __all__ = [
     "UserCreate",
@@ -51,4 +59,10 @@ __all__ = [
     "MarketUpdate",
     "MarketResponse",
     "MarketListResponse",
+    "ClaimRequest",
+    "ClaimResponse",
+    "DisputeRequest",
+    "DisputeResponse",
+    "SettlementResponse",
+    "ContractDetailResponse",
 ]

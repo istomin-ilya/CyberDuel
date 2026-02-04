@@ -4,7 +4,7 @@ CyberDuel Protocol - Main application entry point.
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .config import settings
-from .api import auth, orders, events, markets
+from .api import auth, orders, events, markets, settlement
 
 # Create FastAPI application
 app = FastAPI(
@@ -28,6 +28,7 @@ app.include_router(auth.router)
 app.include_router(orders.router)
 app.include_router(events.router)
 app.include_router(markets.router)
+app.include_router(settlement.router)
 
 @app.on_event("startup")
 async def startup_event():

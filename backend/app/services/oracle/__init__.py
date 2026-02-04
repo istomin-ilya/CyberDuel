@@ -11,6 +11,7 @@ from .base import (
 )
 from .factory import OracleFactory
 from .service import OracleService
+from .background import OracleBackgroundTask, trigger_oracle_poll
 
 __all__ = [
     "OracleProvider",
@@ -20,4 +21,6 @@ __all__ = [
     "OracleAPIException",
     "OracleFactory",
     "OracleService",
+    "OracleBackgroundTask",
+    "trigger_oracle_poll",
 ]
