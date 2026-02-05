@@ -1,8 +1,9 @@
+# app/models/user.py
 """
 User model - Authentication and balance management.
 """
 from decimal import Decimal
-from sqlalchemy import String, Numeric
+from sqlalchemy import String, Numeric, Boolean
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from typing import TYPE_CHECKING
 
@@ -23,6 +24,7 @@ class User(Base, TimestampMixin):
         password_hash: Argon2 hashed password
         balance_available: Funds available for new orders
         balance_locked: Funds currently in active orders/contracts
+        is_admin: Admin privileges flag
     
     Invariant: total_balance = balance_available + balance_locked
     """
@@ -44,6 +46,13 @@ class User(Base, TimestampMixin):
         nullable=False
     )
     
+    # Admin flag
+    is_admin: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        nullable=False
+    )
+    
     # Relationships
     orders: Mapped[list["Order"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     contracts_as_maker: Mapped[list["Contract"]] = relationship(
@@ -62,4 +71,4 @@ class User(Base, TimestampMixin):
     )
     
     def __repr__(self) -> str:
-        return f"<User(id={self.id}, email='{self.email}', available={self.balance_available})>"
+        return f"<User(id={self.id}, email='{self.email}', admin={self.is_admin}, available={self.balance_available})>"

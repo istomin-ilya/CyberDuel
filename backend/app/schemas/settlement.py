@@ -83,3 +83,15 @@ class ContractDetailResponse(BaseModel):
     created_at: datetime
     
     model_config = ConfigDict(from_attributes=True)
+
+
+class AdminResolveDisputeRequest(BaseModel):
+    """Schema for admin dispute resolution"""
+    winning_outcome_id: int
+    resolution_notes: Optional[str] = None
+
+
+class DisputeListResponse(BaseModel):
+    """Schema for list of disputed contracts"""
+    contracts: list[ContractDetailResponse]
+    total: int

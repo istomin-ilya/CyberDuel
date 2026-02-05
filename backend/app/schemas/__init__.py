@@ -1,3 +1,4 @@
+# app/schemas/__init__.py
 """
 Pydantic schemas package.
 """
@@ -35,7 +36,9 @@ from .settlement import (
     DisputeRequest,
     DisputeResponse,
     SettlementResponse,
-    ContractDetailResponse
+    ContractDetailResponse,
+    AdminResolveDisputeRequest,  
+    DisputeListResponse  
 )
 
 __all__ = [
@@ -65,4 +68,6 @@ __all__ = [
     "DisputeResponse",
     "SettlementResponse",
     "ContractDetailResponse",
+    "AdminResolveDisputeRequest",  
+    "DisputeListResponse",  
 ]
