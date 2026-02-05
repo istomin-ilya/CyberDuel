@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     from .order import Order
     from .contract import Contract
     from .transaction import Transaction
+    from .pool_bet import PoolBet
 
 
 class User(Base, TimestampMixin):
@@ -53,7 +54,7 @@ class User(Base, TimestampMixin):
         nullable=False
     )
     
-    # Relationships
+    # Relationships (P2P Direct)
     orders: Mapped[list["Order"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     contracts_as_maker: Mapped[list["Contract"]] = relationship(
         foreign_keys="Contract.maker_id",
@@ -66,6 +67,12 @@ class User(Base, TimestampMixin):
         cascade="all, delete-orphan"
     )
     transactions: Mapped[list["Transaction"]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan"
+    )
+    
+    # Relationships (Pool Market)
+    pool_bets: Mapped[list["PoolBet"]] = relationship(
         back_populates="user",
         cascade="all, delete-orphan"
     )

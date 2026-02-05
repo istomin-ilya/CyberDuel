@@ -17,11 +17,12 @@ class TransactionType(str, Enum):
     """Types of balance operations."""
     DEPOSIT = "DEPOSIT"
     WITHDRAWAL = "WITHDRAWAL"
-    ORDER_LOCK = "ORDER_LOCK"
-    ORDER_UNLOCK = "ORDER_UNLOCK"
-    CONTRACT_LOCK = "CONTRACT_LOCK"
-    SETTLEMENT = "SETTLEMENT"
-    FEE = "FEE"
+    ORDER_LOCK = "ORDER_LOCK"                # P2P: Lock funds for order
+    ORDER_UNLOCK = "ORDER_UNLOCK"            # P2P: Unlock funds on order cancel
+    CONTRACT_LOCK = "CONTRACT_LOCK"          # P2P: Lock funds for contract
+    POOL_BET_LOCK = "POOL_BET_LOCK"          # Pool: Lock funds for pool bet
+    SETTLEMENT = "SETTLEMENT"                # Both: Final settlement payout
+    FEE = "FEE"                              # Both: Platform fee
 
 
 class Transaction(Base, TimestampMixin):
@@ -39,8 +40,8 @@ class Transaction(Base, TimestampMixin):
         balance_available_after: Available balance after operation
         balance_locked_before: Locked balance before operation
         balance_locked_after: Locked balance after operation
-        order_id: Related order (if applicable)
-        contract_id: Related contract (if applicable)
+        order_id: Related order (if applicable, P2P mode)
+        contract_id: Related contract (if applicable, P2P mode)
         description: Human-readable explanation
     """
     __tablename__ = "transactions"
@@ -57,7 +58,7 @@ class Transaction(Base, TimestampMixin):
     balance_locked_before: Mapped[Decimal] = mapped_column(Numeric(precision=10, scale=2), nullable=False)
     balance_locked_after: Mapped[Decimal] = mapped_column(Numeric(precision=10, scale=2), nullable=False)
     
-    # References
+    # References (P2P mode)
     order_id: Mapped[Optional[int]] = mapped_column(ForeignKey("orders.id"))
     contract_id: Mapped[Optional[int]] = mapped_column(ForeignKey("contracts.id"))
     
