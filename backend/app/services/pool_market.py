@@ -89,22 +89,22 @@ class PoolMarketService:
         amount: Decimal
     ) -> PoolBet:
         """
-        Place a bet in a pool market with locked odds.
+        Add liquidity to a pool market outcome.
         
         Flow:
         1. Validate market is pool market and open
         2. Initialize pool states if needed
-        3. Calculate locked odds for this bet
+        3. Calculate user's pool share percentage
         4. Lock user funds (escrow)
-        5. Create PoolBet with locked odds
+        5. Create PoolBet with pool share
         6. Update PoolState (increase total_staked, participant_count)
         
         Args:
             db: Database session
-            user: User placing bet
+            user: User adding liquidity
             market_id: Market ID
-            outcome_id: Outcome to bet on
-            amount: Bet amount
+            outcome_id: Outcome to back
+            amount: Liquidity amount
             
         Returns:
             Created PoolBet
@@ -154,18 +154,13 @@ class PoolMarketService:
                 )
             ).first()
         
-        # Calculate locked odds
-        locked_odds = AMMCalculator.calculate_locked_odds(
-            db=db,
-            market_id=market_id,
-            outcome_id=outcome_id,
-            bet_amount=amount
-        )
+        # Get current pool size (before this bet)
+        current_pool_size = pool_state.total_staked
         
-        # Calculate potential payout
-        potential_payout = AMMCalculator.calculate_potential_payout(
-            locked_odds=locked_odds,
-            bet_amount=amount
+        # Calculate user's pool share percentage
+        initial_pool_share_percentage = AMMCalculator.calculate_pool_share(
+            current_pool_size=current_pool_size,
+            user_deposit=amount
         )
         
         # Lock user funds
@@ -173,7 +168,7 @@ class PoolMarketService:
             db=db,
             user=user,
             amount=amount,
-            description=f"Pool bet on {outcome.name}"
+            description=f"Liquidity for {outcome.name}"
         )
         
         # Create pool bet
@@ -182,16 +177,12 @@ class PoolMarketService:
             market_id=market_id,
             outcome_id=outcome_id,
             amount=amount,
-            locked_odds=locked_odds,
-            potential_payout=potential_payout,
+            initial_pool_share_percentage=initial_pool_share_percentage,
+            pool_size_at_bet=current_pool_size,
             settled=False
         )
         db.add(pool_bet)
         db.flush()
-        
-        # Update the transaction with pool_bet_id
-        # (find the most recent POOL_BET_LOCK transaction for this user)
-        # For now, just add description to transaction
         
         # Update pool state
         pool_state.total_staked += amount
@@ -223,26 +214,28 @@ class PoolMarketService:
         Get current pool state for a market.
         
         Returns:
-            Dictionary with pool statistics and current odds
+            Dictionary with pool statistics, display odds, and estimated ROI
             
         Example:
             {
                 "market_id": 5,
-                "total_pool": "800.00",
+                "total_pool": "1000.00",
                 "outcomes": [
                     {
                         "outcome_id": 1,
                         "name": "NaVi",
-                        "total_staked": "500.00",
-                        "participant_count": 3,
-                        "current_odds": "1.60"
+                        "total_staked": "700.00",
+                        "participant_count": 2,
+                        "estimated_odds": "1.43",
+                        "estimated_roi": "43.00"
                     },
                     {
                         "outcome_id": 2,
                         "name": "G2",
                         "total_staked": "300.00",
-                        "participant_count": 2,
-                        "current_odds": "2.67"
+                        "participant_count": 1,
+                        "estimated_odds": "3.33",
+                        "estimated_roi": "233.00"
                     }
                 ]
             }
@@ -262,14 +255,20 @@ class PoolMarketService:
             PoolState.market_id == market_id
         ).all()
         
-        # Get all outcomes with their current odds
+        # Get all outcomes with their display odds and estimated ROI
         outcomes_data = []
         for pool_state in pool_states:
             outcome = db.query(Outcome).filter(
                 Outcome.id == pool_state.outcome_id
             ).first()
             
-            current_odds = AMMCalculator.get_current_odds(
+            estimated_odds = AMMCalculator.get_current_odds(
+                db=db,
+                market_id=market_id,
+                outcome_id=pool_state.outcome_id
+            )
+            
+            estimated_roi = AMMCalculator.calculate_estimated_roi(
                 db=db,
                 market_id=market_id,
                 outcome_id=pool_state.outcome_id
@@ -280,7 +279,8 @@ class PoolMarketService:
                 "name": outcome.name if outcome else "Unknown",
                 "total_staked": str(pool_state.total_staked),
                 "participant_count": pool_state.participant_count,
-                "current_odds": str(current_odds)
+                "estimated_odds": str(estimated_odds),
+                "estimated_roi": str(estimated_roi)
             })
         
         return {
@@ -327,13 +327,17 @@ class PoolMarketService:
         """
         Settle pool market and distribute payouts to winners.
         
-        Settlement Logic:
-        1. All bets on winning outcome get paid out
-        2. All bets on losing outcomes are lost
-        3. Payout = user's potential_payout - (profit * 2% fee)
-        4. If insufficient liquidity (total from losers < total promised to winners):
-           - Proportional distribution: each winner gets (ratio * their_payout)
-           - ratio = total_from_losers / total_promised_to_winners
+        New Liquidity Pool Settlement Logic:
+        1. Winners share the ENTIRE market pool proportionally to their shares
+        2. Losers lose their liquidity (goes to winners)
+        3. Fee (2%) is charged only on profit
+        
+        Formula for each winner:
+            current_share = bet.amount / winning_pool_total_staked
+            payout_before_fee = current_share × total_market_pool
+            profit = payout_before_fee - bet.amount
+            fee = profit × 2% (only if profit > 0)
+            final_payout = payout_before_fee - fee
         
         Args:
             db: Database session
@@ -344,10 +348,20 @@ class PoolMarketService:
             Dictionary with settlement statistics
             
         Example:
-            Winning bets promise total: $1000
-            Losing bets total: $800
-            Ratio: 800 / 1000 = 0.8
-            User with $100 payout gets: 100 * 0.8 = $80
+            Pool NaVi: 700$ (User1: 500$, User3: 200$)
+            Pool G2: 300$ (User2: 300$)
+            Total: 1000$
+            
+            NaVi wins:
+            User1: share = 500/700 = 71.43%
+                   payout = 71.43% × 1000$ = 714.30$
+                   profit = 214.30$, fee = 4.29$
+                   final = 710.01$
+            
+            User3: share = 200/700 = 28.57%
+                   payout = 28.57% × 1000$ = 285.70$
+                   profit = 85.70$, fee = 1.71$
+                   final = 283.99$
         """
         from app.models.transaction import Transaction
         
@@ -370,7 +384,7 @@ class PoolMarketService:
                 f"settlement says {winning_outcome_id}"
             )
         
-        # Get all bets for this market
+        # Get all unsettled bets for this market
         all_bets = db.query(PoolBet).filter(
             PoolBet.market_id == market_id,
             PoolBet.settled == False
@@ -383,6 +397,7 @@ class PoolMarketService:
                 "winners_count": 0,
                 "losers_count": 0,
                 "total_distributed": "0.00",
+                "total_fees": "0.00",
                 "message": "No unsettled bets found"
             }
         
@@ -390,29 +405,18 @@ class PoolMarketService:
         winning_bets = [bet for bet in all_bets if bet.outcome_id == winning_outcome_id]
         losing_bets = [bet for bet in all_bets if bet.outcome_id != winning_outcome_id]
         
-        # Calculate totals
-        total_promised_to_winners = sum(bet.potential_payout for bet in winning_bets)
-        total_from_losers = sum(bet.amount for bet in losing_bets)
-        
-        # Calculate distribution ratio
-        if total_promised_to_winners == Decimal("0.00"):
-            # No winners (shouldn't happen, but handle gracefully)
-            distribution_ratio = Decimal("0.00")
-        elif total_from_losers >= total_promised_to_winners:
-            # Sufficient liquidity - full payout with fees
-            distribution_ratio = Decimal("1.00")
-        else:
-            # Insufficient liquidity - proportional distribution
-            distribution_ratio = total_from_losers / total_promised_to_winners
+        # Calculate pool sizes
+        winning_pool_total = sum(bet.amount for bet in winning_bets)
+        total_market_pool = sum(bet.amount for bet in all_bets)
         
         total_distributed = Decimal("0.00")
         total_fees = Decimal("0.00")
         
-        # Settle losing bets (they lose their stake)
+        # Settle losing bets (they lose their liquidity)
         for bet in losing_bets:
             user = db.query(User).filter(User.id == bet.user_id).first()
             
-            # Unlock funds (user loses them)
+            # Unlock funds (user loses them, they go to winners)
             user.balance_locked -= bet.amount
             
             # Record transaction
@@ -428,27 +432,35 @@ class PoolMarketService:
             )
             db.add(tx)
             
-            # Mark bet as settled
+            # Mark bet as settled with 0 payout
             bet.settled = True
             bet.settled_at = datetime.now()
             bet.actual_payout = Decimal("0.00")
         
-        # Settle winning bets (they get paid out)
+        # Settle winning bets (they share the total market pool)
         for bet in winning_bets:
             user = db.query(User).filter(User.id == bet.user_id).first()
             
-            # Calculate actual payout
-            if distribution_ratio == Decimal("1.00"):
-                # Full payout with 2% fee
-                profit = bet.potential_payout - bet.amount
-                fee = profit * PoolMarketService.FEE_RATE
-                actual_payout = bet.potential_payout - fee
+            # Calculate this user's share of the winning pool
+            if winning_pool_total > Decimal("0.00"):
+                current_share = bet.amount / winning_pool_total
             else:
-                # Proportional payout (no fee on partial payouts)
-                actual_payout = bet.potential_payout * distribution_ratio
+                current_share = Decimal("0.00")
+            
+            # Calculate payout before fee
+            payout_before_fee = current_share * total_market_pool
+            
+            # Calculate profit and fee
+            profit = payout_before_fee - bet.amount
+            if profit > Decimal("0.00"):
+                fee = profit * PoolMarketService.FEE_RATE
+            else:
                 fee = Decimal("0.00")
             
-            # Unlock stake and add payout
+            # Final payout after fee
+            actual_payout = payout_before_fee - fee
+            
+            # Unlock stake and add payout to available balance
             user.balance_locked -= bet.amount
             user.balance_available += actual_payout
             
@@ -466,12 +478,12 @@ class PoolMarketService:
             )
             db.add(tx)
             
-            # Record fee if applicable
+            # Record fee transaction if applicable
             if fee > Decimal("0.00"):
                 fee_tx = Transaction(
                     user_id=user.id,
                     type=TransactionType.FEE,
-                    amount=fee,
+                    amount=-fee,
                     balance_available_before=user.balance_available,
                     balance_available_after=user.balance_available,
                     balance_locked_before=user.balance_locked,
@@ -496,12 +508,10 @@ class PoolMarketService:
             "winning_outcome_id": winning_outcome_id,
             "winners_count": len(winning_bets),
             "losers_count": len(losing_bets),
-            "total_promised": str(total_promised_to_winners),
-            "total_from_losers": str(total_from_losers),
-            "distribution_ratio": str(distribution_ratio),
+            "total_market_pool": str(total_market_pool),
+            "winning_pool_total": str(winning_pool_total),
             "total_distributed": str(total_distributed),
-            "total_fees": str(total_fees),
-            "liquidity_sufficient": distribution_ratio == Decimal("1.00")
+            "total_fees": str(total_fees)
         }
     
     # Platform fee (2%)

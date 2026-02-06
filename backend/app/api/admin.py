@@ -2,9 +2,11 @@
 """
 Admin endpoints for dispute resolution and management.
 """
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import Optional
+from decimal import Decimal
 
 from ..database import get_db
 from ..api.admin_deps import get_admin_user
@@ -17,6 +19,7 @@ from ..schemas.settlement import (
     DisputeListResponse,
     ContractDetailResponse
 )
+from app.schemas.pool_market import PoolSettlementResponse
 from ..services.settlement import SettlementService, SettlementException
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -222,3 +225,65 @@ def remove_admin_privileges(
     db.commit()
     
     return {"message": f"Admin privileges removed from {user.email}"}
+
+# Pool Market Settlement
+@router.post("/pool-markets/{market_id}/settle", response_model=PoolSettlementResponse)
+def settle_pool_market(
+    market_id: int,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_admin_user)
+):
+    """
+    Settle pool market and distribute payouts (admin only).
+    
+    Settlement process:
+    1. Market must be in SETTLED status (winning outcome already set)
+    2. All winning bets receive payouts (with 2% fee)
+    3. All losing bets lose their stakes
+    4. If insufficient liquidity: proportional distribution
+    
+    Args:
+        market_id: Pool market ID
+        
+    Returns:
+        Settlement statistics
+        
+    Raises:
+        400: Market not ready for settlement
+        403: Not admin
+        404: Market not found
+    """
+    from app.services.pool_market import PoolMarketService, PoolMarketException
+    from app.schemas.pool_market import PoolSettlementResponse
+    
+    try:
+        # Get market first to verify it exists and get winning outcome
+        market = db.query(Market).filter(Market.id == market_id).first()
+        if not market:
+            raise HTTPException(status_code=404, detail="Market not found")
+        
+        if not market.winning_outcome_id:
+            raise HTTPException(
+                status_code=400, 
+                detail="Market does not have a winning outcome set"
+            )
+        
+        # Settle pool market
+        result = PoolMarketService.settle_pool_market(
+            db=db,
+            market_id=market_id,
+            winning_outcome_id=market.winning_outcome_id
+        )
+        
+        return PoolSettlementResponse(
+            market_id=result["market_id"],
+            winning_outcome_id=result["winning_outcome_id"],
+            winners_count=result["winners_count"],
+            losers_count=result["losers_count"],
+            total_market_pool=Decimal(result["total_market_pool"]),
+            winning_pool_total=Decimal(result["winning_pool_total"]),
+            total_distributed=Decimal(result["total_distributed"]),
+            total_fees=Decimal(result["total_fees"])
+        )
+    except PoolMarketException as e:
+        raise HTTPException(status_code=400, detail=str(e))

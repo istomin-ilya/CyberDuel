@@ -117,8 +117,8 @@ class TestPoolModels:
             market_id=market.id,
             outcome_id=outcome.id,
             amount=Decimal("100.00"),
-            locked_odds=Decimal("1.80"),
-            potential_payout=Decimal("180.00"),
+            initial_pool_share_percentage=Decimal("100.000000"),  # 100% of pool
+            pool_size_at_bet=Decimal("0.00"),  # First bet, pool was empty
             settled=False
         )
         db.add(pool_bet)
@@ -128,8 +128,8 @@ class TestPoolModels:
         assert pool_bet.id is not None
         assert pool_bet.user_id == user.id
         assert pool_bet.amount == Decimal("100.00")
-        assert pool_bet.locked_odds == Decimal("1.80")
-        assert pool_bet.potential_payout == Decimal("180.00")
+        assert pool_bet.initial_pool_share_percentage == Decimal("100.000000")
+        assert pool_bet.pool_size_at_bet == Decimal("0.00")
         assert pool_bet.settled == False
     
     def test_create_pool_state(self, db):
@@ -275,16 +275,16 @@ class TestPoolModels:
             market_id=market.id,
             outcome_id=outcome.id,
             amount=Decimal("100.00"),
-            locked_odds=Decimal("1.80"),
-            potential_payout=Decimal("180.00")
+            initial_pool_share_percentage=Decimal("100.000000"),  # First bet: 100%
+            pool_size_at_bet=Decimal("0.00")  # Pool was empty
         )
         bet2 = PoolBet(
             user_id=user.id,
             market_id=market.id,
             outcome_id=outcome.id,
             amount=Decimal("50.00"),
-            locked_odds=Decimal("1.75"),
-            potential_payout=Decimal("87.50")
+            initial_pool_share_percentage=Decimal("33.333333"),  # 50/(100+50) = 33.33%
+            pool_size_at_bet=Decimal("100.00")  # Pool had 100 before this bet
         )
         db.add_all([bet1, bet2])
         db.commit()

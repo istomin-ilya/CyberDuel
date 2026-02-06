@@ -1,5 +1,5 @@
 """
-PoolBet model - Bet placed in a pool market (AMM).
+PoolBet model - Liquidity contribution to a pool market.
 """
 from datetime import datetime
 from decimal import Decimal
@@ -17,33 +17,32 @@ if TYPE_CHECKING:
 
 class PoolBet(Base, TimestampMixin):
     """
-    Bet placed in a pool market with AMM-based pricing.
+    Liquidity contribution to a pool market (DeFi-style).
     
-    In pool markets, users don't match with specific opponents.
-    Instead, they bet into a shared liquidity pool with dynamic odds.
+    In pool markets, users add liquidity to a specific outcome's pool.
+    They receive a share of that pool based on their contribution.
+    When the outcome wins, winners split the entire market pool proportionally.
     
-    Key Concept - Locked Odds:
-    When a user places a bet, their odds are "locked in" at that moment.
-    Even if the pool changes after their bet, they keep their locked odds.
-    This is fair to early bettors who take more risk.
+    Key Concept - Pool Share:
+    User's share = user_deposit / (pool_size + user_deposit)
     
     Example:
-        User bets $100 on "NaVi" when odds are 1.80
-        - locked_odds = 1.80
-        - potential_payout = 100 * 1.80 = 180
-        
-        Even if odds later drop to 1.50, this user still gets 1.80x payout.
+        Pool NaVi = 500$ (existing)
+        User adds 300$:
+        - New pool = 800$
+        - User share = 300/800 = 37.5%
+        - If NaVi wins and total market = 1000$, user gets 37.5% × 1000$ = 375$ (before fee)
     
     Attributes:
-        user_id: Who placed the bet
+        user_id: Who added liquidity
         market_id: Which pool market
-        outcome_id: Which outcome they bet on
-        amount: How much they staked
-        locked_odds: Odds at the moment of bet placement
-        potential_payout: amount * locked_odds (what they win if correct)
+        outcome_id: Which outcome they backed
+        amount: How much they contributed
+        initial_pool_share_percentage: Their share of the outcome pool at bet time (snapshot)
+        pool_size_at_bet: Size of outcome pool before this bet
         settled: Whether bet has been settled
         settled_at: When settlement occurred
-        actual_payout: Final payout after settlement (may differ if insufficient liquidity)
+        actual_payout: Final payout after settlement (0 if outcome lost)
     """
     __tablename__ = "pool_bets"
     
@@ -52,16 +51,16 @@ class PoolBet(Base, TimestampMixin):
     market_id: Mapped[int] = mapped_column(ForeignKey("markets.id"), nullable=False, index=True)
     outcome_id: Mapped[int] = mapped_column(ForeignKey("outcomes.id"), nullable=False, index=True)
     
-    # Bet details
+    # Liquidity contribution details
     amount: Mapped[Decimal] = mapped_column(
         Numeric(precision=20, scale=2),
         nullable=False
     )
-    locked_odds: Mapped[Decimal] = mapped_column(
-        Numeric(precision=10, scale=2),
+    initial_pool_share_percentage: Mapped[Decimal] = mapped_column(
+        Numeric(precision=10, scale=6),  # e.g., 37.500000 for 37.5%
         nullable=False
     )
-    potential_payout: Mapped[Decimal] = mapped_column(
+    pool_size_at_bet: Mapped[Decimal] = mapped_column(
         Numeric(precision=20, scale=2),
         nullable=False
     )
@@ -81,6 +80,6 @@ class PoolBet(Base, TimestampMixin):
     def __repr__(self) -> str:
         return (
             f"<PoolBet(id={self.id}, user_id={self.user_id}, "
-            f"amount={self.amount}, locked_odds={self.locked_odds}, "
+            f"amount={self.amount}, pool_share={self.pool_share_percentage}%, "
             f"settled={self.settled})>"
         )

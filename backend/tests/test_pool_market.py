@@ -184,18 +184,50 @@ class TestAMMCalculator:
         odds_g2 = AMMCalculator.get_current_odds(db, market.id, outcome_g2.id)
         assert odds_g2 == Decimal("2.67")
     
-    def test_calculate_locked_odds(self, db, pool_market):
-        """Test locked odds calculation for new bet"""
+    def test_calculate_pool_share_empty_pool(self):
+        """Test pool share calculation when pool is empty (first bettor)"""
+        # First bettor gets 100% of pool
+        share = AMMCalculator.calculate_pool_share(
+            current_pool_size=Decimal("0.00"),
+            user_deposit=Decimal("100.00")
+        )
+        assert share == Decimal("100.000000")
+    
+    def test_calculate_pool_share_existing_pool(self):
+        """Test pool share calculation with existing pool"""
+        # Pool = 500, deposit = 300
+        # New pool = 800
+        # Share = 300/800 = 37.5%
+        share = AMMCalculator.calculate_pool_share(
+            current_pool_size=Decimal("500.00"),
+            user_deposit=Decimal("300.00")
+        )
+        assert share == Decimal("37.500000")
+    
+    def test_calculate_pool_share_small_deposit(self):
+        """Test pool share calculation with small deposit"""
+        # Pool = 1000, deposit = 10
+        # New pool = 1010
+        # Share = 10/1010 = 0.990099%
+        share = AMMCalculator.calculate_pool_share(
+            current_pool_size=Decimal("1000.00"),
+            user_deposit=Decimal("10.00")
+        )
+        assert share == Decimal("0.990099")
+    
+    def test_calculate_estimated_roi(self, db, pool_market):
+        """Test estimated ROI calculation"""
         market = pool_market["market"]
         outcome_navi = pool_market["outcome_navi"]
         outcome_g2 = pool_market["outcome_g2"]
         
-        # Set initial pool states
+        # Set pool states
+        # Pool NaVi: 700, Pool G2: 300, Total: 1000
         pool_navi = db.query(PoolState).filter(
             PoolState.market_id == market.id,
             PoolState.outcome_id == outcome_navi.id
         ).first()
-        pool_navi.total_staked = Decimal("500.00")
+        pool_navi.total_staked = Decimal("700.00")
         
         pool_g2 = db.query(PoolState).filter(
             PoolState.market_id == market.id,
@@ -205,22 +237,13 @@ class TestAMMCalculator:
         
         db.commit()
         
-        # User wants to bet 100 on NaVi
-        # Current total: 800, current NaVi pool: 500
-        # New total: 900, new NaVi pool: 600
-        # Locked odds = 900 / 600 = 1.50
-        locked_odds = AMMCalculator.calculate_locked_odds(
-            db, market.id, outcome_navi.id, Decimal("100.00")
-        )
-        assert locked_odds == Decimal("1.50")
-    
-    def test_calculate_potential_payout(self):
-        """Test potential payout calculation"""
-        payout = AMMCalculator.calculate_potential_payout(
-            locked_odds=Decimal("1.80"),
-            bet_amount=Decimal("100.00")
-        )
-        assert payout == Decimal("180.00")
+        # NaVi: odds = 1000/700 = 1.43x, ROI = 43%
+        roi_navi = AMMCalculator.calculate_estimated_roi(db, market.id, outcome_navi.id)
+        assert roi_navi == Decimal("43.00")  # (1.43 - 1) * 100 = 43%
+        
+        # G2: odds = 1000/300 = 3.33x, ROI = 233%
+        roi_g2 = AMMCalculator.calculate_estimated_roi(db, market.id, outcome_g2.id)
+        assert roi_g2 == Decimal("233.00")  # (3.33 - 1) * 100 = 233%
     
     def test_get_all_current_odds(self, db, pool_market):
         """Test getting odds for all outcomes"""
@@ -298,6 +321,8 @@ class TestPoolMarketService:
         assert bet.id is not None
         assert bet.user_id == user1.id
         assert bet.amount == Decimal("100.00")
+        assert bet.initial_pool_share_percentage == Decimal("100.000000")  # First bet = 100%
+        assert bet.pool_size_at_bet == Decimal("0.00")  # Pool was empty
         assert bet.settled == False
         
         # Check user balance
@@ -313,39 +338,37 @@ class TestPoolMarketService:
         assert pool_state.total_staked == Decimal("100.00")
         assert pool_state.participant_count == 1
     
-    def test_place_multiple_bets_updates_odds(self, db, pool_market, users):
-        """Test that multiple bets update odds correctly"""
+    def test_place_multiple_bets_updates_shares(self, db, pool_market, users):
+        """Test that multiple bets calculate pool shares correctly"""
         market = pool_market["market"]
         outcome_navi = pool_market["outcome_navi"]
         outcome_g2 = pool_market["outcome_g2"]
         user1 = users["user1"]
         user2 = users["user2"]
         
-        # User1 bets on NaVi
+        # User1 bets on NaVi (first bet, gets 100%)
         bet1 = PoolMarketService.place_pool_bet(
-            db, user1, market.id, outcome_navi.id, Decimal("100.00")
+            db, user1, market.id, outcome_navi.id, Decimal("500.00")
         )
+        assert bet1.initial_pool_share_percentage == Decimal("100.000000")
+        assert bet1.pool_size_at_bet == Decimal("0.00")
         
-        # User2 bets on G2 (different outcome)
+        # User2 bets on G2 (first bet on G2, gets 100% of G2 pool)
         bet2 = PoolMarketService.place_pool_bet(
-            db, user2, market.id, outcome_g2.id, Decimal("100.00")
+            db, user2, market.id, outcome_g2.id, Decimal("300.00")
         )
+        assert bet2.initial_pool_share_percentage == Decimal("100.000000")
+        assert bet2.pool_size_at_bet == Decimal("0.00")
         
-        # Both should get same odds (2.00) since pools are equal
-        assert bet1.locked_odds == Decimal("2.00")
-        assert bet2.locked_odds == Decimal("2.00")
-        
-        # User3 bets MORE on NaVi
+        # User3 adds more to NaVi pool
+        # Current NaVi pool = 500, adding 200
+        # New pool = 700, share = 200/700 = 28.57%
         user3 = users["user3"]
         bet3 = PoolMarketService.place_pool_bet(
             db, user3, market.id, outcome_navi.id, Decimal("200.00")
         )
-        
-        # User3 should get worse odds (NaVi pool is now bigger)
-        # Total before bet3: 200 (100 NaVi + 100 G2)
-        # After bet3: 400 total, 300 NaVi pool
-        # Locked odds: 400 / 300 = 1.33
-        assert bet3.locked_odds == Decimal("1.33")
+        assert bet3.initial_pool_share_percentage == Decimal("28.571429")  # 200/700
+        assert bet3.pool_size_at_bet == Decimal("500.00")
     
     def test_cannot_bet_on_closed_market(self, db, pool_market, users):
         """Test cannot place bet on closed market"""
@@ -407,7 +430,7 @@ class TestPoolMarketService:
         
         # Place some bets
         PoolMarketService.place_pool_bet(
-            db, user1, market.id, outcome_navi.id, Decimal("500.00")
+            db, user1, market.id, outcome_navi.id, Decimal("700.00")
         )
         PoolMarketService.place_pool_bet(
             db, user2, market.id, outcome_g2.id, Decimal("300.00")
@@ -417,14 +440,21 @@ class TestPoolMarketService:
         state = PoolMarketService.get_pool_state(db, market.id)
         
         assert state["market_id"] == market.id
-        assert state["total_pool"] == "800.00"
+        assert state["total_pool"] == "1000.00"
         assert len(state["outcomes"]) == 2
         
         # Find NaVi outcome
         navi_outcome = next(o for o in state["outcomes"] if o["name"] == "NaVi")
-        assert navi_outcome["total_staked"] == "500.00"
+        assert navi_outcome["total_staked"] == "700.00"
         assert navi_outcome["participant_count"] == 1
-        assert navi_outcome["current_odds"] == "1.60"
+        assert navi_outcome["estimated_odds"] == "1.43"  # 1000/700
+        assert navi_outcome["estimated_roi"] == "43.00"  # (1.43 - 1) * 100
+        
+        # Find G2 outcome
+        g2_outcome = next(o for o in state["outcomes"] if o["name"] == "G2")
+        assert g2_outcome["total_staked"] == "300.00"
+        assert g2_outcome["estimated_odds"] == "3.33"  # 1000/300
+        assert g2_outcome["estimated_roi"] == "233.00"  # (3.33 - 1) * 100
     
     def test_get_user_pool_bets(self, db, pool_market, users):
         """Test getting user's pool bets"""

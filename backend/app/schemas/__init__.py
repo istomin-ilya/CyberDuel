@@ -40,6 +40,14 @@ from .settlement import (
     AdminResolveDisputeRequest,  
     DisputeListResponse  
 )
+from .pool_market import (
+    PoolBetCreate,
+    PoolBetResponse,
+    OutcomePoolState,
+    PoolStateResponse,
+    PoolBetListResponse,
+    PoolSettlementResponse
+)
 
 __all__ = [
     "UserCreate",
@@ -69,5 +77,11 @@ __all__ = [
     "SettlementResponse",
     "ContractDetailResponse",
     "AdminResolveDisputeRequest",  
-    "DisputeListResponse",  
+    "DisputeListResponse",
+    "PoolBetCreate",
+    "PoolBetResponse",
+    "OutcomePoolState",
+    "PoolStateResponse",
+    "PoolBetListResponse",
+    "PoolSettlementResponse",
 ]

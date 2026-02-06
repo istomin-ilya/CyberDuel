@@ -1,27 +1,27 @@
 """
-AMM (Automated Market Maker) formulas for pool markets.
+AMM (Automated Market Maker) utilities for pool markets.
 
-Pool Market Pricing:
+Liquidity Pool Model:
 - Each outcome has its own liquidity pool (total_staked)
-- Odds are calculated dynamically based on pool ratios
-- Users get "locked odds" at the moment they place their bet
-- This rewards early bettors who take more risk
+- Users add liquidity and receive a share of the pool
+- Display odds are calculated for informational purposes only
+- Winners split the entire market pool proportionally to their shares
 
 Example:
     Market: "Match Winner"
-    Outcome A pool: $500
-    Outcome B pool: $300
-    Total pool: $800
+    Pool NaVi: $700 (User1: 500$, User3: 200$)
+    Pool G2: $300 (User2: 300$)
+    Total market pool: $1000
     
-    Current odds:
-    - Outcome A: 800 / 500 = 1.60x
-    - Outcome B: 800 / 300 = 2.67x
+    Display odds (informational):
+    - NaVi: 1000 / 700 = 1.43x
+    - G2: 1000 / 300 = 3.33x
     
-    If user bets $100 on Outcome A:
-    - New total: $900
-    - New Outcome A pool: $600
-    - Locked odds for this user: 900 / 600 = 1.50x
-    - Potential payout: 100 * 1.50 = $150
+    If NaVi wins:
+    - User1 share of NaVi pool: 500/700 = 71.43%
+    - User1 gets: 71.43% × 1000$ = 714.30$ (before fee)
+    - User3 share of NaVi pool: 200/700 = 28.57%
+    - User3 gets: 28.57% × 1000$ = 285.70$ (before fee)
 """
 from decimal import Decimal
 from typing import Dict, List
@@ -92,9 +92,12 @@ class AMMCalculator:
         outcome_id: int
     ) -> Decimal:
         """
-        Calculate current display odds for an outcome.
+        Calculate current display odds for an outcome (informational only).
         
-        Formula: odds = total_pool / outcome_pool
+        These odds are NOT used in payouts. They only show approximate returns
+        to help users understand the pool distribution.
+        
+        Formula: display_odds = total_pool / outcome_pool
         
         If outcome pool is 0 (no bets yet), returns a default high odds.
         
@@ -104,12 +107,14 @@ class AMMCalculator:
             outcome_id: Outcome ID
             
         Returns:
-            Current odds (e.g., 1.80 means 1.80x payout)
+            Display odds (e.g., 1.80 means if you bet $100 and win, you'd get ~$180)
             
         Example:
-            Total pool: $800
-            Outcome pool: $500
-            Odds: 800 / 500 = 1.60x
+            Total pool: $1000
+            Outcome pool: $700
+            Display odds: 1000 / 700 = 1.43x
+            
+        Note: These odds change with every new bet and are only approximate.
         """
         total_pool = AMMCalculator.get_total_pool(db, market_id)
         outcome_pool = AMMCalculator.get_outcome_pool(db, market_id, outcome_id)
@@ -132,92 +137,42 @@ class AMMCalculator:
         return odds.quantize(Decimal("0.01"))
     
     @staticmethod
-    def calculate_locked_odds(
-        db: Session,
-        market_id: int,
-        outcome_id: int,
-        bet_amount: Decimal
+    def calculate_pool_share(
+        current_pool_size: Decimal,
+        user_deposit: Decimal
     ) -> Decimal:
         """
-        Calculate locked odds for a new bet (what user will actually get).
+        Calculate user's share percentage when adding liquidity to a pool.
         
-        Formula: locked_odds = (total_pool + bet) / (outcome_pool + bet)
+        Formula: share = user_deposit / (current_pool_size + user_deposit)
         
-        Special case: If pool is empty (first bet in market), odds = number of outcomes.
-        This ensures first bettors get fair odds based on market structure.
-        
-        This is different from current odds because it includes the new bet.
-        The user gets the odds AFTER their bet is added to the pool.
+        Special case: If pool is empty (first contributor), share = 100%
         
         Args:
-            db: Database session
-            market_id: Market ID
-            outcome_id: Outcome ID to bet on
-            bet_amount: Amount user wants to bet
+            current_pool_size: Current size of the outcome pool
+            user_deposit: Amount user is contributing
             
         Returns:
-            Locked odds for this bet
+            Share percentage (e.g., 37.5 for 37.5%)
             
-        Example:
-            Current total: $800
-            Current outcome pool: $500
-            User bets: $100
+        Examples:
+            Empty pool (first bet):
+            - current_pool_size = 0
+            - user_deposit = 100
+            - share = 100 / (0 + 100) = 100%
             
-            New total: $900
-            New outcome pool: $600
-            Locked odds: 900 / 600 = 1.50x
+            Existing pool:
+            - current_pool_size = 500
+            - user_deposit = 300
+            - share = 300 / (500 + 300) = 37.5%
         """
-        total_pool = AMMCalculator.get_total_pool(db, market_id)
-        outcome_pool = AMMCalculator.get_outcome_pool(db, market_id, outcome_id)
+        new_pool_size = current_pool_size + user_deposit
         
-        # Special case: First bet in market (pool is empty)
-        if total_pool == Decimal("0.00"):
-            # Count number of outcomes in market
-            outcome_count = db.query(Outcome).filter(
-                Outcome.market_id == market_id
-            ).count()
-            
-            # First bettor gets odds equal to number of outcomes
-            # (Fair odds: equal chance for each outcome)
-            return Decimal(str(outcome_count))
+        if new_pool_size == Decimal("0.00"):
+            return Decimal("0.00")
         
-        # Calculate new pools after bet
-        new_total_pool = total_pool + bet_amount
-        new_outcome_pool = outcome_pool + bet_amount
-        
-        # Locked odds formula
-        locked_odds = new_total_pool / new_outcome_pool
-        
-        # Ensure minimum odds
-        if locked_odds < Decimal("1.01"):
-            locked_odds = Decimal("1.01")
-        
-        return locked_odds.quantize(Decimal("0.01"))
-    
-    @staticmethod
-    def calculate_potential_payout(
-        locked_odds: Decimal,
-        bet_amount: Decimal
-    ) -> Decimal:
-        """
-        Calculate potential payout for a bet.
-        
-        Formula: payout = bet_amount * locked_odds
-        
-        Args:
-            locked_odds: Locked odds for the bet
-            bet_amount: Amount bet
-            
-        Returns:
-            Potential payout if bet wins
-            
-        Example:
-            Bet: $100
-            Locked odds: 1.80x
-            Payout: 100 * 1.80 = $180
-        """
-        payout = bet_amount * locked_odds
-        return payout.quantize(Decimal("0.01"))
+        share = (user_deposit / new_pool_size) * Decimal("100")
+        return share.quantize(Decimal("0.000001"))  # 6 decimal places
     
     @staticmethod
     def get_all_current_odds(
@@ -225,19 +180,19 @@ class AMMCalculator:
         market_id: int
     ) -> Dict[int, Decimal]:
         """
-        Get current odds for all outcomes in a market.
+        Get current display odds for all outcomes in a market.
         
         Args:
             db: Database session
             market_id: Market ID
             
         Returns:
-            Dictionary mapping outcome_id -> current_odds
+            Dictionary mapping outcome_id -> display_odds
             
         Example:
             {
-                1: Decimal("1.60"),  # Outcome A
-                2: Decimal("2.67")   # Outcome B
+                1: Decimal("1.43"),  # NaVi
+                2: Decimal("3.33")   # G2
             }
         """
         # Get all outcomes for this market
@@ -251,3 +206,34 @@ class AMMCalculator:
             odds_map[outcome.id] = odds
         
         return odds_map
+    
+    @staticmethod
+    def calculate_estimated_roi(
+        db: Session,
+        market_id: int,
+        outcome_id: int
+    ) -> Decimal:
+        """
+        Calculate estimated ROI (Return on Investment) if this outcome wins.
+        
+        This shows users approximately how much profit they'd make relative
+        to their investment if they bet on this outcome and it wins.
+        
+        Formula: ROI = (display_odds - 1) × 100
+        
+        Args:
+            db: Database session
+            market_id: Market ID
+            outcome_id: Outcome ID
+            
+        Returns:
+            Estimated ROI percentage (e.g., 43.0 for 43% profit)
+            
+        Example:
+            Display odds = 1.43x
+            ROI = (1.43 - 1) × 100 = 43%
+            (Bet $100, get back $143, profit = $43)
+        """
+        odds = AMMCalculator.get_current_odds(db, market_id, outcome_id)
+        roi = (odds - Decimal("1.00")) * Decimal("100")
+        return roi.quantize(Decimal("0.01"))
