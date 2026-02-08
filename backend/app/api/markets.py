@@ -10,7 +10,7 @@ from ..database import get_db
 from ..api.deps import get_current_user
 from ..models.user import User
 from ..models.event import Event
-from ..models.market import Market, MarketStatus
+from ..models.market import Market, MarketStatus, MarketMode
 from ..models.outcome import Outcome
 from ..schemas.market import (
     MarketCreate,
@@ -18,6 +18,7 @@ from ..schemas.market import (
     MarketResponse,
     MarketListResponse
 )
+from ..services.pool_market import PoolMarketService
 
 router = APIRouter(prefix="/api/markets", tags=["markets"])
 
@@ -33,6 +34,12 @@ def create_market(
     
     Creates a market for an event and its possible outcomes.
     Initial status is PENDING.
+    
+    Market mode can be specified:
+    - P2P_DIRECT (default): Traditional order book with peer-to-peer matching
+    - POOL_MARKET: Liquidity pool with automated market maker (AMM)
+    
+    For POOL_MARKET mode, pool states are automatically initialized for all outcomes.
     """
     # TODO: Add admin check
     # if not current_user.is_admin:
@@ -56,7 +63,8 @@ def create_market(
         market_type=market_data.market_type,
         title=market_data.title,
         description=market_data.description,
-        status=MarketStatus.PENDING
+        status=MarketStatus.PENDING,
+        market_mode=market_data.market_mode
     )
     db.add(market)
     db.flush()  # Get market.id
@@ -69,6 +77,11 @@ def create_market(
             external_id=outcome_data.external_id
         )
         db.add(outcome)
+    
+    # Initialize pool states for POOL_MARKET mode
+    if market_data.market_mode == MarketMode.POOL_MARKET:
+        db.flush()  # Ensure outcomes are in DB before initializing pool states
+        PoolMarketService.initialize_pool_states(db, market)
     
     db.commit()
     db.refresh(market)

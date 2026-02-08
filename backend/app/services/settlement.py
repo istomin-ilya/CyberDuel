@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import and_
 
 from app.models.contract import Contract, ContractStatus
-from app.models.market import Market
+from app.models.market import Market, MarketStatus
 from app.models.outcome import Outcome
 from app.models.user import User
 from app.models.transaction import TransactionType
@@ -378,3 +378,102 @@ class SettlementService:
         ).all()
         
         return contracts
+    
+    @staticmethod
+    def settle_market(market_id: int, db: Session) -> dict:
+        """
+        Settle all contracts for a P2P market.
+        
+        Processes all ACTIVE and CLAIMED contracts for the market and settles them
+        based on the market's winning outcome.
+        
+        Args:
+            market_id: Market ID to settle
+            db: Database session
+            
+        Returns:
+            dict: Settlement statistics with keys:
+                - market_id: Market ID
+                - total_contracts: Total contracts found
+                - settled: Number of newly settled contracts
+                - already_settled: Number of already settled contracts
+                - errors: Number of errors encountered
+                - error_details: List of error details (if any)
+                
+        Raises:
+            ValueError: If market not found, not SETTLED, or no winning outcome
+        """
+        # Получить маркет
+        market = db.query(Market).filter(Market.id == market_id).first()
+        if not market:
+            raise ValueError("Market not found")
+        
+        # Проверить что маркет в статусе SETTLED
+        if market.status != MarketStatus.SETTLED:
+            raise ValueError("Market must be in SETTLED status")
+        
+        # Проверить что есть winning outcome
+        if not market.winning_outcome_id:
+            raise ValueError("Market must have winning_outcome_id set")
+        
+        # Найти все контракты маркета (ACTIVE или CLAIMED)
+        contracts = db.query(Contract).filter(
+            Contract.market_id == market_id,
+            Contract.status.in_([ContractStatus.ACTIVE, ContractStatus.CLAIMED])
+        ).all()
+        
+        # Если контрактов нет, вернуть раньше
+        if not contracts:
+            return {
+                "market_id": market_id,
+                "total_contracts": 0,
+                "settled": 0,
+                "already_settled": 0,
+                "errors": 0,
+                "error_details": None,
+                "message": "No contracts to settle"
+            }
+        
+        # Счетчики
+        settled_count = 0
+        already_settled_count = 0
+        error_count = 0
+        errors = []
+        
+        # Settlement каждого контракта
+        for contract in contracts:
+            try:
+                # Пропустить уже settled контракты
+                if contract.status == ContractStatus.SETTLED:
+                    already_settled_count += 1
+                    continue
+                
+                # Settle контракт
+                SettlementService.settle_contract(
+                    db=db,
+                    contract=contract,
+                    winning_outcome_id=market.winning_outcome_id
+                )
+                settled_count += 1
+                
+            except Exception as e:
+                error_count += 1
+                errors.append({
+                    "contract_id": contract.id,
+                    "error": str(e)
+                })
+                # Continue - не прерывать весь процесс
+                continue
+        
+        # Commit транзакции
+        db.commit()
+        
+        # Return результат
+        return {
+            "market_id": market_id,
+            "total_contracts": len(contracts),
+            "settled": settled_count,
+            "already_settled": already_settled_count,
+            "errors": error_count,
+            "error_details": errors if errors else None
+        }

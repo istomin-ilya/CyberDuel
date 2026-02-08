@@ -2,9 +2,11 @@
 """
 Market and Outcome schemas for API requests and responses.
 """
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from datetime import datetime
 from typing import Optional
+
+from app.models.market import MarketMode
 
 
 class OutcomeCreate(BaseModel):
@@ -31,6 +33,11 @@ class MarketCreate(BaseModel):
     title: str  # "Match Winner", "Total Kills Over/Under"
     description: Optional[str] = None
     outcomes: list[OutcomeCreate]  # Must have at least 2 outcomes
+    market_mode: Optional[MarketMode] = Field(
+        default=MarketMode.P2P_DIRECT,
+        description="Market mode: P2P_DIRECT for peer-to-peer order matching, POOL_MARKET for liquidity pool betting",
+        example="P2P_DIRECT"
+    )
 
 
 class MarketUpdate(BaseModel):
@@ -48,6 +55,7 @@ class MarketResponse(BaseModel):
     description: Optional[str] = None
     status: str  # PENDING, OPEN, LOCKED, SETTLED
     winning_outcome_id: Optional[int] = None
+    market_mode: MarketMode
     created_at: datetime
     updated_at: Optional[datetime] = None
     

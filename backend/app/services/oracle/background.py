@@ -3,6 +3,7 @@
 Background task for polling match results and triggering settlement.
 """
 import time
+import logging
 from datetime import datetime
 from typing import Optional
 from sqlalchemy.orm import Session
@@ -11,8 +12,11 @@ from app.database import SessionLocal
 from app.models.event import Event, EventStatus
 from app.models.market import Market, MarketStatus
 from app.config import settings
+from app.services.unified_settlement import UnifiedSettlementService
 from .service import OracleService
 from .base import MatchNotFoundException, OracleAPIException
+
+logger = logging.getLogger(__name__)
 
 
 class OracleBackgroundTask:
@@ -42,6 +46,12 @@ class OracleBackgroundTask:
         Single polling cycle.
         
         Checks all events in LIVE or FINISHED status and updates them.
+        
+        For each finished event:
+        - Fetches result from oracle provider
+        - Updates market status to SETTLED
+        - Sets winning_outcome_id
+        - Triggers unified settlement (supports both P2P_DIRECT and POOL_MARKET modes)
         
         Returns:
             dict: Statistics about the polling cycle
@@ -151,12 +161,38 @@ class OracleBackgroundTask:
                 if winning_outcome:
                     market.winning_outcome_id = winning_outcome.id
                     market.status = MarketStatus.SETTLED
-                    settled_count += 1
                     
                     print(
                         f"[OracleTask] Market {market.id} settled: "
                         f"winner={winning_outcome.name}"
                     )
+                    
+                    # Commit market status change before triggering settlement
+                    db.commit()
+                    
+                    # Trigger unified settlement for both P2P and Pool markets
+                    try:
+                        settlement_result = UnifiedSettlementService.settle_market(
+                            market.id, db
+                        )
+                        logger.info(
+                            f"Market {market.id} settled via unified service",
+                            extra={
+                                "market_id": market.id,
+                                "market_mode": market.market_mode.value,
+                                "settlement_result": settlement_result
+                            }
+                        )
+                        settled_count += 1
+                    except Exception as e:
+                        logger.error(
+                            f"Failed to settle market {market.id}",
+                            extra={
+                                "market_id": market.id,
+                                "error": str(e)
+                            }
+                        )
+                        # Не прерываем весь процесс - продолжаем обработку других маркетов
         
         return settled_count
     

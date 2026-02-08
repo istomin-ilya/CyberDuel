@@ -20,7 +20,9 @@ from ..schemas.settlement import (
     ContractDetailResponse
 )
 from app.schemas.pool_market import PoolSettlementResponse
+from app.schemas.unified_settlement import UnifiedSettlementResponse
 from ..services.settlement import SettlementService, SettlementException
+from ..services.unified_settlement import UnifiedSettlementService
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -226,6 +228,47 @@ def remove_admin_privileges(
     
     return {"message": f"Admin privileges removed from {user.email}"}
 
+# Unified Market Settlement (for both P2P and Pool markets)
+@router.post("/markets/{market_id}/settle", response_model=UnifiedSettlementResponse)
+def settle_market(
+    market_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_admin_user)
+):
+    """
+    Settle market (unified endpoint for both P2P and Pool markets).
+    
+    Settles a market based on its mode (P2P_DIRECT or POOL_MARKET).
+    Market must be in SETTLED status with winning_outcome_id set.
+    
+    Settlement process:
+    - P2P_DIRECT: Will settle all matched orders for the market
+    - POOL_MARKET: Will distribute payouts from liquidity pool
+    
+    Args:
+        market_id: Market ID to settle
+        
+    Returns:
+        Settlement result (structure depends on market mode)
+        
+    Raises:
+        400: Market not ready for settlement or validation error
+        404: Market not found
+        500: Settlement processing error
+    """
+    try:
+        result = UnifiedSettlementService.settle_market(market_id, db)
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Settlement failed: {str(e)}"
+        )
+
+# DEPRECATED: Use /api/admin/markets/{market_id}/settle instead
 # Pool Market Settlement
 @router.post("/pool-markets/{market_id}/settle", response_model=PoolSettlementResponse)
 def settle_pool_market(
