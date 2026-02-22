@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import Optional
 
+from ..api.admin_deps import get_admin_user
 from ..database import get_db
 from ..api.deps import get_current_user
 from ..models.user import User
@@ -145,7 +146,7 @@ def manual_settle_contract(
     contract_id: int,
     winning_outcome_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_admin_user)
 ):
     """
     Manually settle a contract (admin-only or after auto-settle).
@@ -259,7 +260,7 @@ def get_contract_details(
 @router.get("/contracts/pending-claims", response_model=list[ContractDetailResponse])
 def get_pending_claims(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_admin_user)
 ):
     """
     Get contracts with pending claims (for testing/monitoring).

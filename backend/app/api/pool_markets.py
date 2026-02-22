@@ -16,7 +16,7 @@ from app.database import get_db
 from app.models.user import User
 from app.models.market import Market
 from app.models.pool_bet import PoolBet
-from app.api.auth import get_current_user
+from app.api.deps import get_current_user
 from app.schemas.pool_market import (
     PoolBetCreate,
     PoolBetResponse,
@@ -27,7 +27,7 @@ from app.schemas.pool_market import (
 from app.services.pool_market import PoolMarketService, PoolMarketException
 
 
-router = APIRouter(prefix="/pool-markets", tags=["pool-markets"])
+router = APIRouter(prefix="/api/pool-markets", tags=["pool-markets"])
 
 
 @router.post("/{market_id}/bet", response_model=PoolBetResponse, status_code=201)
