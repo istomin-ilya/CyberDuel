@@ -2,6 +2,7 @@
 """
 Application configuration.
 """
+from pathlib import Path
 from pydantic_settings import BaseSettings  # Changed from pydantic
 from pydantic import ConfigDict
 
@@ -9,9 +10,15 @@ from pydantic import ConfigDict
 class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
-    model_config = ConfigDict(env_file=".env")
+    # Look for .env in backend root, not in app/
+    model_config = ConfigDict(
+        env_file=str(Path(__file__).parent.parent / ".env"),
+        env_file_encoding="utf-8",
+        extra="ignore"
+    )
     
     # Application
+    APP_NAME: str = "CyberDuel Protocol"
     DEBUG: bool = False
     
     # Database
@@ -19,7 +26,9 @@ class Settings(BaseSettings):
     
     # Security
     SECRET_KEY: str = "your-secret-key-change-in-production"
+    JWT_SECRET: str = "your-jwt-secret-key-change-in-production"
     ALGORITHM: str = "HS256"
+    JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     
