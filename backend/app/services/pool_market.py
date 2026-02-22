@@ -7,7 +7,7 @@ Handles:
 - Settlement and payout distribution
 """
 from decimal import Decimal
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List, Dict
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
@@ -138,12 +138,16 @@ class PoolMarketService:
             raise PoolMarketException("Bet amount must be positive")
         
         # Initialize pool states if needed
+        
+        # NOTE: with_for_update() is silently ignored on SQLite.
+        # Two concurrent bets could read the same total_staked and calculate
+        # incorrect pool_share_percentage. For production, migrate to PostgreSQL.
         pool_state = db.query(PoolState).filter(
             and_(
                 PoolState.market_id == market_id,
                 PoolState.outcome_id == outcome_id
             )
-        ).first()
+        ).with_for_update().first()
         
         if not pool_state:
             PoolMarketService.initialize_pool_states(db, market)
@@ -434,7 +438,7 @@ class PoolMarketService:
             
             # Mark bet as settled with 0 payout
             bet.settled = True
-            bet.settled_at = datetime.now()
+            bet.settled_at = datetime.now(timezone.utc)
             bet.actual_payout = Decimal("0.00")
         
         # Settle winning bets (they share the total market pool)
@@ -495,7 +499,7 @@ class PoolMarketService:
             
             # Mark bet as settled
             bet.settled = True
-            bet.settled_at = datetime.now()
+            bet.settled_at = datetime.now(timezone.utc)
             bet.actual_payout = actual_payout
             
             total_distributed += actual_payout

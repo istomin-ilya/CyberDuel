@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..api.deps import get_current_user
+from ..api.admin_deps import get_admin_user
 from ..models.user import User
 from ..models.event import Event, EventStatus
 from ..schemas.event import EventCreate, EventUpdate, EventResponse, EventListResponse
@@ -19,7 +19,7 @@ router = APIRouter(prefix="/api/events", tags=["events"])
 def create_event(
     event_data: EventCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_admin_user)
 ):
     """
     Create a new event (admin-only)
@@ -27,9 +27,6 @@ def create_event(
     Admin creates events for upcoming matches.
     Initial status is SCHEDULED.
     """
-    # TODO: Add admin check
-    # if not current_user.is_admin:
-    #     raise HTTPException(status_code=403, detail="Admin access required")
     
     event = Event(
         game_type=event_data.game_type,
@@ -100,7 +97,7 @@ def update_event(
     event_id: int,
     event_data: EventUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_admin_user)
 ):
     """
     Update event (admin-only)
@@ -108,9 +105,7 @@ def update_event(
     Used to progress event through lifecycle:
     SCHEDULED → OPEN → LIVE → FINISHED → SETTLED
     """
-    # TODO: Add admin check
-    # if not current_user.is_admin:
-    #     raise HTTPException(status_code=403, detail="Admin access required")
+    
     
     event = db.query(Event).filter(Event.id == event_id).first()
     if not event:

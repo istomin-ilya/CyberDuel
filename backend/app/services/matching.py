@@ -84,6 +84,9 @@ class MatchingService:
         # Lock order for update to prevent race conditions
         # with_for_update() ensures no other transaction can modify this order
         # until we commit
+        # NOTE: with_for_update() is silently ignored on SQLite (no row-level locking support).
+        # For production, migrate to PostgreSQL where this provides actual SELECT FOR UPDATE.
+        # On SQLite this is safe for MVP since it's single-process with no true concurrency.
         order = db.query(Order).filter(Order.id == order_id).with_for_update().first()
         
         if not order:

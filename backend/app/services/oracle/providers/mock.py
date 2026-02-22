@@ -4,7 +4,7 @@ Mock oracle provider for development and testing.
 Returns fake data without calling external APIs.
 """
 from typing import Optional, Dict, Any
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from ..base import OracleProvider, MatchResult, MatchNotFoundException
 
 
@@ -29,8 +29,8 @@ class MockOracleProvider(OracleProvider):
             "score_a": 16,
             "score_b": 12,
             "status": "finished",
-            "started_at": datetime.now() - timedelta(hours=3),
-            "finished_at": datetime.now() - timedelta(hours=1),
+            "started_at": datetime.now(timezone.utc) - timedelta(hours=3),
+            "finished_at": datetime.now(timezone.utc) - timedelta(hours=1),
         },
         "match_2": {
             "id": "match_2",
@@ -41,8 +41,8 @@ class MockOracleProvider(OracleProvider):
             "score_a": 13,
             "score_b": 16,
             "status": "finished",
-            "started_at": datetime.now() - timedelta(hours=5),
-            "finished_at": datetime.now() - timedelta(hours=3),
+            "started_at": datetime.now(timezone.utc) - timedelta(hours=5),
+            "finished_at": datetime.now(timezone.utc) - timedelta(hours=3),
         },
         "match_3": {
             "id": "match_3",
@@ -53,7 +53,7 @@ class MockOracleProvider(OracleProvider):
             "score_a": 0,
             "score_b": 0,
             "status": "scheduled",
-            "started_at": datetime.now() + timedelta(hours=2),
+            "started_at": datetime.now(timezone.utc) + timedelta(hours=2),
             "finished_at": None,
         },
     }

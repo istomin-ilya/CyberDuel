@@ -1,7 +1,7 @@
 """
 Authentication service - password hashing, JWT tokens.
 """
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from decimal import Decimal
 
@@ -35,7 +35,7 @@ class AuthService:
     def create_access_token(data: dict) -> str:
         """Create JWT access token (short-lived)."""
         to_encode = data.copy()
-        expire = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        expire = datetime.now(timezone.utc) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
         to_encode.update({"exp": expire, "type": "access"})
         
         encoded_jwt = jwt.encode(
@@ -49,7 +49,7 @@ class AuthService:
     def create_refresh_token(data: dict) -> str:
         """Create JWT refresh token (long-lived)."""
         to_encode = data.copy()
-        expire = datetime.utcnow() + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+        expire = datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
         to_encode.update({"exp": expire, "type": "refresh"})
         
         encoded_jwt = jwt.encode(

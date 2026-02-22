@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..api.deps import get_current_user
+from ..api.admin_deps import get_admin_user
 from ..models.user import User
 from ..models.event import Event
 from ..models.market import Market, MarketStatus, MarketMode
@@ -27,7 +27,7 @@ router = APIRouter(prefix="/api/markets", tags=["markets"])
 def create_market(
     market_data: MarketCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_admin_user)
 ):
     """
     Create a new market with outcomes (admin-only)
@@ -41,9 +41,7 @@ def create_market(
     
     For POOL_MARKET mode, pool states are automatically initialized for all outcomes.
     """
-    # TODO: Add admin check
-    # if not current_user.is_admin:
-    #     raise HTTPException(status_code=403, detail="Admin access required")
+    
     
     # Validate event exists
     event = db.query(Event).filter(Event.id == market_data.event_id).first()
@@ -138,7 +136,7 @@ def update_market(
     market_id: int,
     market_data: MarketUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_admin_user)
 ):
     """
     Update market (admin-only)
@@ -148,9 +146,7 @@ def update_market(
     
     Also used to set winning_outcome_id after settlement.
     """
-    # TODO: Add admin check
-    # if not current_user.is_admin:
-    #     raise HTTPException(status_code=403, detail="Admin access required")
+    
     
     market = db.query(Market).filter(Market.id == market_id).first()
     if not market:

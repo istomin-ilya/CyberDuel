@@ -4,7 +4,7 @@ Background task for polling match results and triggering settlement.
 """
 import time
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 from sqlalchemy.orm import Session
 
@@ -109,7 +109,7 @@ class OracleBackgroundTask:
             # Update event status based on result
             if result.status == "finished" and event.status != EventStatus.FINISHED:
                 event.status = EventStatus.FINISHED
-                event.actual_end = result.finished_at or datetime.now()
+                event.actual_end = result.finished_at or datetime.now(timezone.utc)
                 stats["events_updated"] += 1
                 
                 print(f"[OracleTask] Event {event.id} marked as FINISHED")
@@ -210,7 +210,7 @@ class OracleBackgroundTask:
         
         while True:
             try:
-                print(f"[OracleTask] Polling at {datetime.now()}")
+                print(f"[OracleTask] Polling at {datetime.now(timezone.utc)}")
                 stats = self.poll_once()
                 print(f"[OracleTask] Stats: {stats}")
                 

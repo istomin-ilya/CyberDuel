@@ -5,7 +5,7 @@ Background task for automatic settlement of unchallenged claims.
 Runs periodically to settle contracts where challenge period has expired.
 """
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 
 from app.database import SessionLocal
@@ -125,7 +125,7 @@ class SettlementBackgroundTask:
         
         while True:
             try:
-                print(f"[SettlementTask] Processing at {datetime.now()}")
+                print(f"[SettlementTask] Processing at {datetime.now(timezone.utc)}")
                 stats = self.process_once()
                 print(f"[SettlementTask] Stats: {stats}")
                 

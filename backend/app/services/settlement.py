@@ -8,7 +8,7 @@ Flow:
 3. If disputed → admin resolves manually
 """
 from decimal import Decimal
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
@@ -19,6 +19,27 @@ from app.models.outcome import Outcome
 from app.models.user import User
 from app.models.transaction import TransactionType
 from app.services.escrow import EscrowService
+
+
+def _ensure_utc(dt: Optional[datetime]) -> Optional[datetime]:
+    """
+    Ensure datetime is timezone-aware (UTC).
+    
+    SQLite doesn't fully support timezone-aware datetimes, so we need to
+    explicitly add UTC timezone to naive datetimes from the database.
+    
+    Args:
+        dt: Datetime that may or may not be timezone-aware
+        
+    Returns:
+        Timezone-aware datetime in UTC, or None if input is None
+    """
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        # Assume naive datetimes from DB are in UTC
+        return dt.replace(tzinfo=timezone.utc)
+    return dt
 
 
 class SettlementException(Exception):
@@ -99,9 +120,9 @@ class SettlementService:
         
         # Set claim data
         contract.claim_initiated_by = claiming_user.id
-        contract.claim_initiated_at = datetime.now()
+        contract.claim_initiated_at = datetime.now(timezone.utc)
         contract.challenge_deadline = (
-            datetime.now() + 
+            datetime.now(timezone.utc) + 
             timedelta(minutes=SettlementService.CHALLENGE_PERIOD_MINUTES)
         )
         contract.status = ContractStatus.CLAIMED
@@ -151,7 +172,8 @@ class SettlementService:
             )
         
         # Validate within challenge period
-        if datetime.now() > contract.challenge_deadline:
+        challenge_deadline = _ensure_utc(contract.challenge_deadline)
+        if datetime.now(timezone.utc) > challenge_deadline:
             raise DisputeException(
                 "Challenge period has expired"
             )
@@ -201,7 +223,8 @@ class SettlementService:
             )
         
         # Validate deadline passed
-        if datetime.now() < contract.challenge_deadline:
+        challenge_deadline = _ensure_utc(contract.challenge_deadline)
+        if datetime.now(timezone.utc) < challenge_deadline:
             raise SettlementException(
                 "Challenge period has not expired yet"
             )
@@ -217,14 +240,16 @@ class SettlementService:
         return SettlementService.settle_contract(
             db=db,
             contract=contract,
-            winning_outcome_id=market.winning_outcome_id
+            winning_outcome_id=market.winning_outcome_id,
+            auto_commit=False
         )
     
     @staticmethod
     def settle_contract(
         db: Session,
         contract: Contract,
-        winning_outcome_id: int
+        winning_outcome_id: int,
+        auto_commit: bool = True
     ) -> Contract:
         """
         Settle contract and distribute funds.
@@ -240,6 +265,8 @@ class SettlementService:
             db: Database session
             contract: Contract to settle
             winning_outcome_id: Actual winning outcome
+            auto_commit: Whether to commit immediately (default True). 
+                        Set to False when settling multiple contracts in a transaction.
             
         Returns:
             Contract: Settled contract
@@ -334,10 +361,13 @@ class SettlementService:
         # Update contract
         contract.winner_id = winner.id
         contract.status = ContractStatus.SETTLED
-        contract.settled_at = datetime.now()
+        contract.settled_at = datetime.now(timezone.utc)
         
-        db.commit()
-        db.refresh(contract)
+        if auto_commit:
+            db.commit()
+            db.refresh(contract)
+        else:
+            db.flush()
         
         return contract
     
@@ -370,7 +400,8 @@ class SettlementService:
         Returns:
             list[Contract]: Contracts ready to auto-settle
         """
-        now = datetime.now()
+        # For SQLite, convert timezone-aware datetime to naive UTC for comparison
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
         
         contracts = db.query(Contract).filter(
             Contract.status == ContractStatus.CLAIMED,
@@ -448,11 +479,12 @@ class SettlementService:
                     already_settled_count += 1
                     continue
                 
-                # Settle контракт
+                # Settle контракт (без auto_commit для batch operation)
                 SettlementService.settle_contract(
                     db=db,
                     contract=contract,
-                    winning_outcome_id=market.winning_outcome_id
+                    winning_outcome_id=market.winning_outcome_id,
+                    auto_commit=False
                 )
                 settled_count += 1
                 

@@ -3,7 +3,7 @@ Unit tests for Settlement system with Optimistic Oracle.
 """
 import pytest
 from decimal import Decimal
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -286,7 +286,7 @@ class TestDisputeClaim:
         SettlementService.claim_result(db, contract, maker, outcome_navi.id)
         
         # Manually expire deadline
-        contract.challenge_deadline = datetime.now() - timedelta(minutes=1)
+        contract.challenge_deadline = datetime.now(timezone.utc) - timedelta(minutes=1)
         db.commit()
         
         # Taker tries to dispute
@@ -455,7 +455,7 @@ class TestAutoSettlement:
         SettlementService.claim_result(db, contract, maker, outcome_navi.id)
         
         # Expire deadline
-        contract.challenge_deadline = datetime.now() - timedelta(minutes=1)
+        contract.challenge_deadline = datetime.now(timezone.utc) - timedelta(minutes=1)
         db.commit()
         
         # Auto-settle
@@ -487,7 +487,7 @@ class TestAutoSettlement:
         SettlementService.claim_result(db, contract, maker, outcome_navi.id)
         
         # Expire deadline
-        contract.challenge_deadline = datetime.now() - timedelta(minutes=1)
+        contract.challenge_deadline = datetime.now(timezone.utc) - timedelta(minutes=1)
         db.commit()
         
         # Get pending claims

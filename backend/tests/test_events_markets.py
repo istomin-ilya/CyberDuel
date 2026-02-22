@@ -3,7 +3,7 @@ Unit tests for Event and Market CRUD.
 """
 import pytest
 from decimal import Decimal
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -65,7 +65,7 @@ class TestEventCRUD:
             team_b="Spirit",
             tournament="IEM Katowice",
             status=EventStatus.SCHEDULED,
-            scheduled_start=datetime.now() + timedelta(hours=2),
+            scheduled_start=datetime.now(timezone.utc) + timedelta(hours=2),
             external_match_id="match_1"
         )
         db.add(event)
@@ -96,14 +96,14 @@ class TestEventCRUD:
         
         # OPEN -> LIVE
         event.status = EventStatus.LIVE
-        event.actual_start = datetime.now()
+        event.actual_start = datetime.now(timezone.utc)
         db.commit()
         assert event.status == EventStatus.LIVE
         assert event.actual_start is not None
         
         # LIVE -> FINISHED
         event.status = EventStatus.FINISHED
-        event.actual_end = datetime.now()
+        event.actual_end = datetime.now(timezone.utc)
         db.commit()
         assert event.status == EventStatus.FINISHED
         assert event.actual_end is not None

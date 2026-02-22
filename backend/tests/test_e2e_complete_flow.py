@@ -6,7 +6,7 @@ Simulates real user journey through the system.
 """
 import pytest
 from decimal import Decimal
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -101,7 +101,7 @@ class TestCompleteUserJourney:
             tournament="IEM Katowice 2025",
             status=EventStatus.SCHEDULED,
             external_match_id="match_1",  # Mock provider
-            scheduled_start=datetime.now() + timedelta(hours=2)
+            scheduled_start=datetime.now(timezone.utc) + timedelta(hours=2)
         )
         db.add(event)
         db.flush()
@@ -172,12 +172,12 @@ class TestCompleteUserJourney:
         
         # Step 5: Match starts
         event.status = EventStatus.LIVE
-        event.actual_start = datetime.now()
+        event.actual_start = datetime.now(timezone.utc)
         db.commit()
         
         # Step 6: Match finishes (NaVi wins - match_1 in mock)
         event.status = EventStatus.FINISHED
-        event.actual_end = datetime.now()
+        event.actual_end = datetime.now(timezone.utc)
         db.commit()
         
         # Oracle fetches result
@@ -207,7 +207,7 @@ class TestCompleteUserJourney:
         assert claimed_contract.claim_initiated_by == maker.id
         
         # Step 8: Challenge period expires (simulate)
-        contract.challenge_deadline = datetime.now() - timedelta(minutes=1)
+        contract.challenge_deadline = datetime.now(timezone.utc) - timedelta(minutes=1)
         db.commit()
         
         # Step 9: Auto-settlement
@@ -328,7 +328,7 @@ class TestCompleteUserJourney:
         
         # Taker claims win
         SettlementService.claim_result(db, contract, taker, outcome_faze.id)
-        contract.challenge_deadline = datetime.now() - timedelta(minutes=1)
+        contract.challenge_deadline = datetime.now(timezone.utc) - timedelta(minutes=1)
         db.commit()
         
         # Auto-settle
