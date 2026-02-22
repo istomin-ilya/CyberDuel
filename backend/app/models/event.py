@@ -28,6 +28,7 @@ class GameType(str, Enum):
     CS2 = "CS2"
     DOTA2 = "DOTA2"
     LOL = "LOL"
+    VALORANT = "VALORANT"
 
 
 class Event(Base, TimestampMixin):

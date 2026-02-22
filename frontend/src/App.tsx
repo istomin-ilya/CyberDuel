@@ -1,19 +1,66 @@
-function App() {
-  return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-      <div className="bg-white p-8 rounded-xl shadow-lg text-center">
-        <h1 className="text-3xl font-bold text-blue-600 underline mb-4">
-          Hello Tailwind!
-        </h1>
-        <p className="text-gray-600">
-          Frontend is running with Vite + React + TypeScript.
-        </p>
-        <button className="mt-6 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition">
-          Click me
-        </button>
-      </div>
-    </div>
-  )
+import { useEffect } from 'react'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { useAuthStore } from '@/store/authStore'
+import LoginPage from '@/pages/LoginPage'
+import RegisterPage from '@/pages/RegisterPage'
+import DashboardPage from '@/pages/DashboardPage'
+
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const user = useAuthStore((s) => s.user)
+  const token = localStorage.getItem('access_token')
+
+  if (!token && !user) {
+    return <Navigate to="/login" replace />
+  }
+
+  return <>{children}</>
 }
 
-export default App
+function PublicRoute({ children }: { children: React.ReactNode }) {
+  const user = useAuthStore((s) => s.user)
+
+  if (user) {
+    return <Navigate to="/" replace />
+  }
+
+  return <>{children}</>
+}
+
+export default function App() {
+  const fetchMe = useAuthStore((s) => s.fetchMe)
+
+  useEffect(() => {
+    fetchMe()
+  }, [])
+
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route
+          path="/login"
+          element={
+            <PublicRoute>
+              <LoginPage />
+            </PublicRoute>
+          }
+        />
+        <Route
+          path="/register"
+          element={
+            <PublicRoute>
+              <RegisterPage />
+            </PublicRoute>
+          }
+        />
+        <Route
+          path="/*"
+          element={
+            <ProtectedRoute>
+              <DashboardPage />
+            </ProtectedRoute>
+          }
+        />
+      </Routes>
+    </BrowserRouter>
+  )
+}
