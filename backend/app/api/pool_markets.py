@@ -25,6 +25,7 @@ from app.schemas.pool_market import (
     OutcomePoolState
 )
 from app.services.pool_market import PoolMarketService, PoolMarketException
+from app.services.escrow import InsufficientFundsError
 
 
 router = APIRouter(prefix="/api/pool-markets", tags=["pool-markets"])
@@ -64,6 +65,8 @@ def place_pool_bet(
         )
         return pool_bet
     except PoolMarketException as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except InsufficientFundsError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 

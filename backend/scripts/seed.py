@@ -324,5 +324,35 @@ def seed() -> None:
     print(f"    Pool bets created: {stats['bets']}")
 
 
+def reset_db() -> None:
+    """Drop all rows from every table then re-seed."""
+    from app.models import (
+        PoolBet, PoolState, Transaction, Contract, Order,
+        Outcome, Market, Event, User,
+    )
+    db = SessionLocal()
+    try:
+        # Delete in FK-safe order
+        for model in [
+            PoolBet, PoolState, Transaction, Contract, Order,
+            Outcome, Market, Event, User,
+        ]:
+            db.query(model).delete()
+        db.commit()
+        print("🗑️  All tables truncated.")
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+
 if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser(description="Seed the CyberDuel database")
+    parser.add_argument("--reset", action="store_true", help="Truncate all tables before seeding")
+    args = parser.parse_args()
+
+    if args.reset:
+        reset_db()
     seed()

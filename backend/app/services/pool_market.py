@@ -57,6 +57,7 @@ class PoolMarketService:
         if not outcomes:
             raise PoolMarketException("Market has no outcomes")
         
+        now = datetime.now(timezone.utc)
         pool_states = []
         for outcome in outcomes:
             # Check if already exists
@@ -72,7 +73,9 @@ class PoolMarketService:
                     market_id=market.id,
                     outcome_id=outcome.id,
                     total_staked=Decimal("0.00"),
-                    participant_count=0
+                    participant_count=0,
+                    created_at=now,
+                    updated_at=now,
                 )
                 db.add(pool_state)
                 pool_states.append(pool_state)
@@ -176,6 +179,7 @@ class PoolMarketService:
         )
         
         # Create pool bet
+        now = datetime.now(timezone.utc)
         pool_bet = PoolBet(
             user_id=user.id,
             market_id=market_id,
@@ -183,7 +187,9 @@ class PoolMarketService:
             amount=amount,
             initial_pool_share_percentage=initial_pool_share_percentage,
             pool_size_at_bet=current_pool_size,
-            settled=False
+            settled=False,
+            created_at=now,
+            updated_at=now,
         )
         db.add(pool_bet)
         db.flush()
