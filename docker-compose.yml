@@ -1,0 +1,25 @@
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "3228:3228"
+    volumes:
+      - ./backend/data:/app/data
+    environment:
+      - DATABASE_URL=sqlite:///./data/cyberduel.db
+      - SECRET_KEY=cyberduel-dev-secret-key
+      - ORACLE_PROVIDER=mock
+      - CORS_ORIGINS=["http://localhost:5173","http://localhost:80"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3228/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      backend:
+        condition: service_healthy

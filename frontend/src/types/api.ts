@@ -67,6 +67,15 @@ export interface Contract {
   settled_at: string | null
 }
 
+export interface ContractDetail extends Contract {
+  claim_initiated_by?: number | null
+  claim_initiated_at?: string | null
+  challenge_deadline?: string | null
+  disputed_by?: number | null
+  disputed_at?: string | null
+  created_at: string
+}
+
 export interface PoolBet {
   id: number
   user_id: number
@@ -77,6 +86,7 @@ export interface PoolBet {
   pool_size_at_bet: string
   settled: boolean
   actual_payout: string | null
+  created_at?: string
 }
 
 export interface PoolState {
@@ -90,4 +100,39 @@ export interface PoolState {
     estimated_odds: string
     estimated_roi: string
   }[]
+}
+
+export interface Transaction {
+  id: number
+  type:
+    | 'DEPOSIT'
+    | 'WITHDRAWAL'
+    | 'ORDER_LOCK'
+    | 'ORDER_UNLOCK'
+    | 'CONTRACT_LOCK'
+    | 'POOL_BET_LOCK'
+    | 'SETTLEMENT'
+    | 'FEE'
+    | string
+  amount: string
+  description: string | null
+  balance_available_before: string
+  balance_available_after: string
+  balance_locked_before: string
+  balance_locked_after: string
+  order_id: number | null
+  contract_id: number | null
+  created_at: string
+}
+
+export interface MyContractsResponse {
+  contracts: ContractDetail[]
+  total: number
+}
+
+export interface TransactionListResponse {
+  transactions: Transaction[]
+  total: number
+  page: number
+  page_size: number
 }

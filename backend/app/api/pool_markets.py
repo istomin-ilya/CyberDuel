@@ -118,6 +118,36 @@ def get_pool_state(
         raise HTTPException(status_code=400, detail=str(e))
 
 
+@router.get("/my-bets", response_model=PoolBetListResponse)
+def get_my_pool_bets_all_markets(
+    settled: Optional[bool] = Query(None, description="Filter by settlement status"),
+    page: int = Query(1, ge=1, description="Page number"),
+    page_size: int = Query(20, ge=1, le=100, description="Items per page"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get current user's pool bets across all markets."""
+    query = db.query(PoolBet).filter(PoolBet.user_id == current_user.id)
+
+    if settled is not None:
+        query = query.filter(PoolBet.settled == settled)
+
+    total = query.count()
+    bets = (
+        query.order_by(PoolBet.created_at.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+        .all()
+    )
+
+    return PoolBetListResponse(
+        bets=bets,
+        total=total,
+        page=page,
+        page_size=page_size
+    )
+
+
 @router.get("/{market_id}/my-bets", response_model=PoolBetListResponse)
 def get_my_pool_bets(
     market_id: int,

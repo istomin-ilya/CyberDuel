@@ -196,7 +196,7 @@ export default function MarketsPage() {
     load()
   }, [gameFilter, statusFilter])
 
-  const handleCardClick = (event: Event, market: Market | undefined) => {
+  const handleCardClick = (_event: Event, market: Market | undefined) => {
     if (!market) return
     if (market.market_mode === 'p2p_direct') {
       navigate(`/p2p?market=${market.id}`)

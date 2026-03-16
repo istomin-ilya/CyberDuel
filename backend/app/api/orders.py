@@ -108,6 +108,7 @@ def list_orders(
     market_id: Optional[int] = None,
     outcome_id: Optional[int] = None,
     status: Optional[str] = None,
+    my_orders: bool = True,
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_db),
@@ -125,6 +126,8 @@ def list_orders(
     query = db.query(Order)
     
     # Apply filters
+    if my_orders:
+        query = query.filter(Order.user_id == current_user.id)
     if market_id:
         query = query.filter(Order.market_id == market_id)
     if outcome_id:

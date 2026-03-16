@@ -3,8 +3,9 @@
 Application configuration.
 """
 from pathlib import Path
+import json
 from pydantic_settings import BaseSettings  # Changed from pydantic
-from pydantic import ConfigDict
+from pydantic import ConfigDict, field_validator
 
 
 class Settings(BaseSettings):
@@ -22,7 +23,7 @@ class Settings(BaseSettings):
     DEBUG: bool = False
     
     # Database
-    DATABASE_URL: str = "sqlite:///./cyberduel.db"
+    DATABASE_URL: str = "sqlite:///./data/cyberduel.db"
     
     # Security
     SECRET_KEY: str = "your-secret-key-change-in-production"
@@ -33,7 +34,17 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     
     # CORS
-    CORS_ORIGINS: list = ["http://localhost:3000", "http://localhost:5173"]
+    CORS_ORIGINS: list[str] = ["http://localhost:3000", "http://localhost:5173"]
+
+    @field_validator("CORS_ORIGINS", mode="before")
+    @classmethod
+    def parse_cors_origins(cls, value):
+        if isinstance(value, str):
+            trimmed = value.strip()
+            if trimmed.startswith("[") and trimmed.endswith("]"):
+                return json.loads(trimmed)
+            return [origin.strip() for origin in value.split(",") if origin.strip()]
+        return value
     
     # Oracle
     ORACLE_PROVIDER: str = "mock"  # "mock" or "pandascore"

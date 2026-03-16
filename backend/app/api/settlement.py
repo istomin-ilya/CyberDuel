@@ -5,6 +5,7 @@ Settlement API endpoints for Optimistic Oracle.
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import Optional
+from sqlalchemy import or_
 
 from ..api.admin_deps import get_admin_user
 from ..database import get_db
@@ -18,7 +19,8 @@ from ..schemas.settlement import (
     DisputeRequest,
     DisputeResponse,
     SettlementResponse,
-    ContractDetailResponse
+    ContractDetailResponse,
+    MyContractsResponse
 )
 from ..services.settlement import (
     SettlementService,
@@ -226,6 +228,40 @@ def manual_settle_contract(
             status_code=500,
             detail=f"Failed to settle contract: {str(e)}"
         )
+
+
+@router.get("/contracts/my", response_model=MyContractsResponse)
+def get_my_contracts(
+    status: Optional[str] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Get all contracts where current user is maker or taker.
+
+    Optional filter:
+    - status: ACTIVE | CLAIMED | SETTLED | DISPUTED
+    """
+    query = db.query(Contract).filter(
+        or_(
+            Contract.maker_id == current_user.id,
+            Contract.taker_id == current_user.id,
+        )
+    )
+
+    if status:
+        normalized_status = status.upper()
+        valid_statuses = {contract_status.value for contract_status in ContractStatus}
+        if normalized_status not in valid_statuses:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid status filter. Allowed: {', '.join(sorted(valid_statuses))}",
+            )
+        query = query.filter(Contract.status == ContractStatus(normalized_status))
+
+    contracts = query.order_by(Contract.created_at.desc()).all()
+
+    return MyContractsResponse(contracts=contracts, total=len(contracts))
 
 
 @router.get("/contracts/{contract_id}", response_model=ContractDetailResponse)

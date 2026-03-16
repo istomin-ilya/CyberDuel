@@ -95,3 +95,9 @@ class DisputeListResponse(BaseModel):
     """Schema for list of disputed contracts"""
     contracts: list[ContractDetailResponse]
     total: int
+
+
+class MyContractsResponse(BaseModel):
+    """Schema for current user's contracts list"""
+    contracts: list[ContractDetailResponse]
+    total: int

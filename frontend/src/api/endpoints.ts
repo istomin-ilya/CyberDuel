@@ -1,5 +1,17 @@
 import client from '@/api/client'
-import type { AuthResponse, User, Event, Market, Order, Contract, PoolBet, PoolState } from '@/types/api'
+import type {
+  AuthResponse,
+  User,
+  Event,
+  Market,
+  Order,
+  Contract,
+  ContractDetail,
+  MyContractsResponse,
+  PoolBet,
+  PoolState,
+  TransactionListResponse,
+} from '@/types/api'
 
 // ─── AUTH ───
 export const auth = {
@@ -33,7 +45,7 @@ export const markets = {
 
 // ─── ORDERS (P2P) ───
 export const orders = {
-  list: (params?: { market_id?: number; outcome_id?: number; status?: string; skip?: number; limit?: number }) =>
+  list: (params?: { market_id?: number; outcome_id?: number; status?: string; my_orders?: boolean; skip?: number; limit?: number }) =>
     client.get<{ orders: Order[]; total: number }>('/api/orders', { params }),
 
   get: (id: number) =>
@@ -52,7 +64,12 @@ export const orders = {
 // ─── CONTRACTS ───
 export const contracts = {
   get: (id: number) =>
-    client.get<Contract>(`/api/settlement/contracts/${id}`),
+    client.get<ContractDetail>(`/api/settlement/contracts/${id}`),
+
+  my: (status?: Contract['status']) =>
+    client.get<MyContractsResponse>(`/api/settlement/contracts/my`, {
+      params: status ? { status } : undefined,
+    }),
 
   claim: (id: number, winning_outcome_id: number) =>
     client.post(`/api/settlement/contracts/${id}/claim`, { winning_outcome_id }),
@@ -75,6 +92,9 @@ export const poolMarkets = {
   myBets: (id: number, params?: { settled?: boolean; page?: number; page_size?: number }) =>
     client.get<{ bets: PoolBet[]; total: number; page: number; page_size: number }>(`/api/pool-markets/${id}/my-bets`, { params }),
 
+  myBetsAll: (params?: { settled?: boolean; page?: number; page_size?: number }) =>
+    client.get<{ bets: PoolBet[]; total: number; page: number; page_size: number }>(`/api/pool-markets/my-bets`, { params }),
+
   allBets: (id: number, params?: { settled?: boolean; page?: number; page_size?: number }) =>
     client.get<{ bets: PoolBet[]; total: number; page: number; page_size: number }>(`/api/pool-markets/${id}/all-bets`, { params }),
 }
@@ -95,4 +115,20 @@ export const admin = {
 
   removeAdmin: (user_id: number) =>
     client.delete(`/api/admin/users/${user_id}/remove-admin`),
+}
+
+export const portfolio = {
+  getMyOrders: () =>
+    client.get<{ orders: Order[]; total: number }>('/api/orders', { params: { my_orders: true } }),
+
+  getMyContracts: (status?: Contract['status']) =>
+    client.get<MyContractsResponse>('/api/settlement/contracts/my', {
+      params: status ? { status } : undefined,
+    }),
+
+  getMyPoolBets: (params?: { settled?: boolean; page?: number; page_size?: number }) =>
+    client.get<{ bets: PoolBet[]; total: number; page: number; page_size: number }>('/api/pool-markets/my-bets', { params }),
+
+  getMyTransactions: (page = 1, page_size = 20) =>
+    client.get<TransactionListResponse>('/api/transactions/my', { params: { page, page_size } }),
 }

@@ -2,6 +2,22 @@
 
 A Peer-to-Peer Prediction Market Protocol for Esports Event Outcomes
 
+## Quick Start
+
+### Docker (recommended)
+```bash
+cp .env.example .env
+docker-compose up --build
+# Backend: http://localhost:3228
+# Frontend: http://localhost:5173
+```
+
+### Local Development
+```bash
+cd backend && uvicorn app.main:app --port 3228
+cd frontend && npm run dev
+```
+
 ## Abstract
 
 This repository implements a distributed prediction market system demonstrating alternative architectures to traditional bookmaker models. The protocol facilitates direct peer-to-peer order matching between market participants, with deterministic escrow mechanisms and hybrid oracle-based outcome verification.

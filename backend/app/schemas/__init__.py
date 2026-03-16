@@ -50,6 +50,10 @@ from .pool_market import (
     PoolSettlementResponse
 )
 from app.schemas.unified_settlement import UnifiedSettlementResponse
+from .transaction import (
+    TransactionResponse,
+    TransactionListResponse,
+)
 
 __all__ = [
     "UserCreate",
@@ -88,4 +92,6 @@ __all__ = [
     "PoolBetListResponse",
     "PoolSettlementResponse",
     "UnifiedSettlementResponse",
+    "TransactionResponse",
+    "TransactionListResponse",
 ]

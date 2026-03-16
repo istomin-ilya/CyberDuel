@@ -460,6 +460,7 @@ export default function P2PPage() {
         market_id: mkt.id,
         outcome_id: outcome.id,
         status: 'OPEN',
+        my_orders: false,
       })
       setOrderList(data.orders ?? [])
     } catch {

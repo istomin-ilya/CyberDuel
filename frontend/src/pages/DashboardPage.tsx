@@ -3,14 +3,7 @@ import AppLayout from '@/components/layout/AppLayout'
 import MarketsPage from '@/pages/MarketsPage'
 import P2PPage from '@/pages/P2PPage'
 import PoolPage from '@/pages/PoolPage'
-
-// Заглушки страниц — заменим на Days 23-24
-
-
-
-function PortfolioPage() {
-  return <div style={{ color: '#4a5568', fontFamily: 'JetBrains Mono, monospace', fontSize: '12px' }}>Portfolio — coming soon</div>
-}
+import PortfolioPage from '@/pages/PortfolioPage'
 
 export default function DashboardPage() {
   return (
