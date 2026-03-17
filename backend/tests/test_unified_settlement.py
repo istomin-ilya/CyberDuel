@@ -223,7 +223,7 @@ def test_settle_p2p_market(db, p2p_market, regular_users):
     result = UnifiedSettlementService.settle_market(market.id, db)
     
     # Verify result
-    assert result["mode"] == "P2P_DIRECT"
+    assert result["mode"] == "p2p_direct"
     assert result["market_id"] == market.id
     assert result["total_contracts"] == 2
     assert result["settled"] == 2
@@ -281,7 +281,7 @@ def test_settle_pool_market(db, pool_market, regular_users):
     result = UnifiedSettlementService.settle_market(market.id, db)
     
     # Verify result
-    assert result["mode"] == "POOL_MARKET"
+    assert result["mode"] == "pool_market"
     assert result["market_id"] == market.id
     assert Decimal(result["total_market_pool"]) == Decimal("1000.00")
     assert Decimal(result["winning_pool_total"]) == Decimal("500.00")
@@ -459,7 +459,7 @@ def test_market_mode_in_response(db, p2p_market, pool_market, regular_users):
     
     # Settle P2P market
     p2p_result = UnifiedSettlementService.settle_market(p2p_mkt.id, db)
-    assert p2p_result["mode"] == "P2P_DIRECT"
+    assert p2p_result["mode"] == "p2p_direct"
     
     # Create bet for Pool market
     pool_mkt.status = MarketStatus.OPEN
@@ -476,4 +476,4 @@ def test_market_mode_in_response(db, p2p_market, pool_market, regular_users):
     
     # Settle Pool market
     pool_result = UnifiedSettlementService.settle_market(pool_mkt.id, db)
-    assert pool_result["mode"] == "POOL_MARKET"
+    assert pool_result["mode"] == "pool_market"

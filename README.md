@@ -7,7 +7,7 @@ A Peer-to-Peer Prediction Market Protocol for Esports Event Outcomes
 ### Docker (recommended)
 ```bash
 cp .env.example .env
-docker-compose up --build
+docker compose up --build
 # Backend: http://localhost:3228
 # Frontend: http://localhost:5173
 ```

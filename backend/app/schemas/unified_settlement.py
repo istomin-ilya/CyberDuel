@@ -2,7 +2,7 @@
 """
 Unified settlement response schemas.
 """
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List, Dict, Any
 from app.models.market import MarketMode
 
@@ -71,3 +71,14 @@ class UnifiedSettlementResponse(BaseModel):
     
     class Config:
         from_attributes = True
+
+    @field_validator("mode", mode="before")
+    @classmethod
+    def normalize_mode(cls, value):
+        if isinstance(value, MarketMode):
+            return value
+        if isinstance(value, str):
+            normalized = value.lower()
+            if normalized in {mode.value for mode in MarketMode}:
+                return normalized
+        return value

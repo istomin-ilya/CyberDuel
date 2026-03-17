@@ -45,7 +45,7 @@ class UnifiedSettlementService:
         if market.market_mode == MarketMode.P2P_DIRECT:
             # P2P Direct - settlement через SettlementService
             result = SettlementService.settle_market(market_id, db)
-            result["mode"] = "P2P_DIRECT"
+            result["mode"] = MarketMode.P2P_DIRECT.value
             return result
             
         elif market.market_mode == MarketMode.POOL_MARKET:
@@ -57,7 +57,7 @@ class UnifiedSettlementService:
             )
             
             # Добавляем mode к результату
-            result["mode"] = "POOL_MARKET"
+            result["mode"] = MarketMode.POOL_MARKET.value
             return result
         
         else:

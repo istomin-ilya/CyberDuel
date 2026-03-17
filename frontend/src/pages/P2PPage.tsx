@@ -71,26 +71,39 @@ function OrderRow({ order, maxAmount, onMatch }: {
 
 // ─── Bet Panel ────────────────────────────────────────────────────────────────
 
-function BetPanel({ market, selectedOutcome, onSuccess }: {
+function BetPanel({ market, selectedOutcome, selectedOrder, onSuccess }: {
   market: Market
   selectedOutcome: Outcome | null
+  selectedOrder: Order | null
   onSuccess: () => void
 }) {
   const { user } = useAuthStore()
   const [mode, setMode] = useState<'create' | 'match'>('create')
   const [amount, setAmount] = useState('100')
   const [oddsInput, setOddsInput] = useState('1.80')
-  const [matchOrderId, setMatchOrderId] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
 
+  useEffect(() => {
+    if (!selectedOrder) return
+    setMode('match')
+    setAmount(parseFloat(selectedOrder.unfilled_amount).toFixed(2))
+    setError('')
+  }, [selectedOrder])
+
   const stake = parseFloat(amount) || 0
-  const odds = parseFloat(oddsInput) || 1.80
+  const odds = mode === 'match'
+    ? (selectedOrder ? parseFloat(selectedOrder.odds) || 1.8 : 1.8)
+    : (parseFloat(oddsInput) || 1.80)
   const risk = calcTakerRisk(stake, odds)
   const fee = risk * 0.02
   const payout = calcPayout(stake, odds)
   const balance = parseFloat(user?.balance_available ?? '0')
+  const availableToMatch = selectedOrder ? parseFloat(selectedOrder.unfilled_amount) : 0
+  const selectedOrderOutcome = selectedOrder
+    ? market.outcomes.find((o) => o.id === selectedOrder.outcome_id) ?? null
+    : null
 
   const handleCreate = async () => {
     if (!selectedOutcome) return setError('Select an outcome')
@@ -117,13 +130,15 @@ function BetPanel({ market, selectedOutcome, onSuccess }: {
   }
 
   const handleMatch = async () => {
-    if (!matchOrderId) return setError('Enter order ID')
+    if (!selectedOrder) return setError('Select an order from the order book')
     if (stake <= 0) return setError('Enter a valid amount')
+    if (stake > availableToMatch) return setError('Amount exceeds available amount')
+    if (stake > balance) return setError('Insufficient balance')
 
     setLoading(true)
     setError('')
     try {
-      await orders.match(parseInt(matchOrderId), stake.toFixed(2))
+      await orders.match(selectedOrder.id, stake.toFixed(2))
       setSuccess('Order matched!')
       setTimeout(() => { setSuccess(''); onSuccess() }, 1500)
     } catch (e: any) {
@@ -207,22 +222,40 @@ function BetPanel({ market, selectedOutcome, onSuccess }: {
         </div>
       </div>
 
-      {/* Match order ID (match mode only) */}
       {mode === 'match' && (
-        <div>
-          <div className="text-xs uppercase tracking-widest mb-2"
+        <div
+          className="rounded-lg p-3 flex flex-col gap-1.5"
+          style={{ background: '#0d1117', border: '1px solid rgba(0,212,255,0.06)' }}
+        >
+          <div className="text-xs uppercase tracking-widest mb-1"
             style={{ color: '#4a5568', fontFamily: 'JetBrains Mono, monospace' }}>
-            Order ID
+            Match this order
           </div>
-          <input
-            className="w-full px-3 py-2 rounded-lg text-sm outline-none transition-all"
-            style={inputStyle}
-            placeholder="e.g. 42"
-            value={matchOrderId}
-            onChange={(e) => setMatchOrderId(e.target.value)}
-            onFocus={focusStyle}
-            onBlur={blurStyle}
-          />
+
+          {selectedOrder ? (
+            <>
+              <div className="flex justify-between text-xs" style={{ fontFamily: 'JetBrains Mono, monospace' }}>
+                <span style={{ color: '#4a5568' }}>Outcome</span>
+                <span style={{ color: '#e2e8f0' }}>{selectedOrderOutcome?.name ?? 'Unknown'}</span>
+              </div>
+              <div className="flex justify-between text-xs" style={{ fontFamily: 'JetBrains Mono, monospace' }}>
+                <span style={{ color: '#4a5568' }}>Maker odds</span>
+                <span style={{ color: '#e2e8f0' }}>×{parseFloat(selectedOrder.odds).toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-xs" style={{ fontFamily: 'JetBrains Mono, monospace' }}>
+                <span style={{ color: '#4a5568' }}>Available amount</span>
+                <span style={{ color: '#e2e8f0' }}>{availableToMatch.toFixed(2)} CR</span>
+              </div>
+              <div className="flex justify-between text-xs" style={{ fontFamily: 'JetBrains Mono, monospace' }}>
+                <span style={{ color: '#4a5568' }}>Your potential risk</span>
+                <span style={{ color: '#e2e8f0' }}>{risk.toFixed(2)} CR</span>
+              </div>
+            </>
+          ) : (
+            <div className="text-xs" style={{ color: '#4a5568', fontFamily: 'JetBrains Mono, monospace' }}>
+              Select an order from the order book to match.
+            </div>
+          )}
         </div>
       )}
 
@@ -238,6 +271,7 @@ function BetPanel({ market, selectedOutcome, onSuccess }: {
             style={inputStyle}
             type="number"
             min="0"
+            max={mode === 'match' && selectedOrder ? availableToMatch.toFixed(2) : undefined}
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
             onFocus={focusStyle}
@@ -450,6 +484,7 @@ export default function P2PPage() {
   const [market, setMarket] = useState<Market | null>(null)
   const [orderList, setOrderList] = useState<Order[]>([])
   const [selectedOutcome, setSelectedOutcome] = useState<Outcome | null>(null)
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -459,12 +494,21 @@ export default function P2PPage() {
       const { data } = await orders.list({
         market_id: mkt.id,
         outcome_id: outcome.id,
-        status: 'OPEN',
         my_orders: false,
       })
-      setOrderList(data.orders ?? [])
+      const openOrders = (data.orders ?? []).filter((order) => {
+        const isOtherUserOrder = order.user_id !== useAuthStore.getState().user?.id
+        const isMatchableStatus = order.status === 'OPEN' || order.status === 'PARTIALLY_FILLED'
+        return isOtherUserOrder && isMatchableStatus
+      })
+      setOrderList(openOrders)
+      setSelectedOrder((prev) => {
+        if (!prev) return null
+        return openOrders.find((order) => order.id === prev.id) ?? null
+      })
     } catch {
       setOrderList([])
+      setSelectedOrder(null)
     }
   }
 
@@ -489,6 +533,7 @@ export default function P2PPage() {
 
   const handleOutcomeChange = async (outcome: Outcome) => {
     setSelectedOutcome(outcome)
+    setSelectedOrder(null)
     if (market) await loadOrders(market, outcome)
   }
 
@@ -564,13 +609,14 @@ export default function P2PPage() {
                   onMatch={(o) => {
                     const outcome = market.outcomes.find(out => out.id === o.outcome_id)
                     if (outcome) setSelectedOutcome(outcome)
+                    setSelectedOrder(o)
                   }} />
               ))}
             </div>
           )}
         </div>
 
-        <BetPanel market={market} selectedOutcome={selectedOutcome}
+        <BetPanel market={market} selectedOutcome={selectedOutcome} selectedOrder={selectedOrder}
           onSuccess={() => market && loadOrders(market, selectedOutcome)} />
       </div>
     </div>

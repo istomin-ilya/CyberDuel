@@ -2,7 +2,7 @@
 """
 Market and Outcome schemas for API requests and responses.
 """
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from datetime import datetime
 from typing import Optional
 
@@ -36,8 +36,19 @@ class MarketCreate(BaseModel):
     market_mode: Optional[MarketMode] = Field(
         default=MarketMode.P2P_DIRECT,
         description="Market mode: P2P_DIRECT for peer-to-peer order matching, POOL_MARKET for liquidity pool betting",
-        example="P2P_DIRECT"
+        example="p2p_direct"
     )
+
+    @field_validator("market_mode", mode="before")
+    @classmethod
+    def normalize_market_mode(cls, value):
+        if value is None or isinstance(value, MarketMode):
+            return value
+        if isinstance(value, str):
+            normalized = value.lower()
+            if normalized in {mode.value for mode in MarketMode}:
+                return normalized
+        return value
 
 
 class MarketUpdate(BaseModel):
@@ -63,6 +74,17 @@ class MarketResponse(BaseModel):
     outcomes: list[OutcomeResponse] = []
     
     model_config = ConfigDict(from_attributes=True)
+
+    @field_validator("market_mode", mode="before")
+    @classmethod
+    def normalize_market_mode(cls, value):
+        if isinstance(value, MarketMode):
+            return value
+        if isinstance(value, str):
+            normalized = value.lower()
+            if normalized in {mode.value for mode in MarketMode}:
+                return normalized
+        return value
 
 
 class MarketListResponse(BaseModel):
