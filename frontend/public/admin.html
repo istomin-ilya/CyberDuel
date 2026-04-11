@@ -1,0 +1,962 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CyberDuel Admin</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      background: radial-gradient(circle at 20% 0%, #1f2937 0%, #0b1220 45%, #020617 100%);
+      min-height: 100vh;
+    }
+
+    .panel {
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      backdrop-filter: blur(6px);
+    }
+
+    .tab-btn.active {
+      background: rgba(59, 130, 246, 0.22);
+      border-color: rgba(96, 165, 250, 0.9);
+      color: #eff6ff;
+    }
+
+    .table-wrap {
+      max-height: 58vh;
+      overflow: auto;
+    }
+
+    .table-wrap thead th {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+  </style>
+</head>
+<body class="text-slate-100">
+  <div class="min-h-screen p-4 md:p-6">
+    <div class="mx-auto max-w-[1440px]">
+      <header class="panel rounded-xl p-4 md:p-5 mb-5">
+        <div class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+          <div>
+            <h1 class="text-2xl font-bold tracking-wide">CyberDuel Admin Console</h1>
+            <p class="text-slate-400 text-sm mt-1">Static admin page powered by vanilla JavaScript.</p>
+          </div>
+          <div class="w-full md:w-[620px]">
+            <label for="tokenInput" class="block text-sm text-slate-300 mb-1">Admin JWT Token (Bearer)</label>
+            <div class="flex gap-2">
+              <input id="tokenInput" type="text" placeholder="Paste JWT token here" class="w-full rounded-lg border border-slate-600 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 focus:border-blue-400 focus:outline-none" />
+              <button id="applyTokenBtn" class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold hover:bg-blue-500">Apply</button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <div class="grid grid-cols-1 gap-5 md:grid-cols-[220px_1fr]">
+        <aside class="panel rounded-xl p-3 h-fit">
+          <nav class="space-y-2">
+            <button class="tab-btn active w-full rounded-lg border border-slate-700 px-3 py-2 text-left text-sm" data-tab="eventsTab">Events</button>
+            <button class="tab-btn w-full rounded-lg border border-slate-700 px-3 py-2 text-left text-sm" data-tab="marketsTab">Markets</button>
+            <button class="tab-btn w-full rounded-lg border border-slate-700 px-3 py-2 text-left text-sm" data-tab="settlementTab">Settlement</button>
+            <button class="tab-btn w-full rounded-lg border border-slate-700 px-3 py-2 text-left text-sm" data-tab="usersTab">Users</button>
+          </nav>
+        </aside>
+
+        <main>
+          <section id="eventsTab" class="tab-panel panel rounded-xl p-4 md:p-5">
+            <div class="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <h2 class="text-xl font-semibold">Events</h2>
+              <div class="flex gap-2">
+                <button id="refreshEventsBtn" class="rounded-lg border border-slate-600 px-3 py-2 text-sm hover:bg-slate-800">Refresh</button>
+                <button id="openCreateEventModalBtn" class="rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold hover:bg-blue-500">Create Event</button>
+              </div>
+            </div>
+
+            <div class="table-wrap rounded-lg border border-slate-700">
+              <table class="w-full text-sm">
+                <thead class="bg-slate-900/95 text-slate-300">
+                  <tr>
+                    <th class="p-3 text-left">ID</th>
+                    <th class="p-3 text-left">Name</th>
+                    <th class="p-3 text-left">Team A</th>
+                    <th class="p-3 text-left">Team B</th>
+                    <th class="p-3 text-left">Status</th>
+                    <th class="p-3 text-left">Scheduled At</th>
+                    <th class="p-3 text-left">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="eventsTableBody" class="divide-y divide-slate-800"></tbody>
+              </table>
+            </div>
+          </section>
+
+          <section id="marketsTab" class="tab-panel panel rounded-xl p-4 md:p-5 hidden">
+            <div class="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <h2 class="text-xl font-semibold">Markets</h2>
+              <div class="flex flex-col gap-2 md:flex-row md:items-center">
+                <select id="marketEventFilter" class="rounded-lg border border-slate-600 bg-slate-900/80 px-3 py-2 text-sm">
+                  <option value="">Select event id</option>
+                </select>
+                <button id="loadMarketsBtn" class="rounded-lg border border-slate-600 px-3 py-2 text-sm hover:bg-slate-800">Load Markets</button>
+                <button id="openCreateMarketModalBtn" class="rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold hover:bg-blue-500">Create Market</button>
+              </div>
+            </div>
+
+            <div class="table-wrap rounded-lg border border-slate-700">
+              <table class="w-full text-sm">
+                <thead class="bg-slate-900/95 text-slate-300">
+                  <tr>
+                    <th class="p-3 text-left">ID</th>
+                    <th class="p-3 text-left">Name</th>
+                    <th class="p-3 text-left">Mode</th>
+                    <th class="p-3 text-left">Status</th>
+                    <th class="p-3 text-left">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="marketsTableBody" class="divide-y divide-slate-800"></tbody>
+              </table>
+            </div>
+          </section>
+
+          <section id="settlementTab" class="tab-panel panel rounded-xl p-4 md:p-5 hidden">
+            <div class="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <h2 class="text-xl font-semibold">Settlement</h2>
+              <button id="refreshContractsBtn" class="rounded-lg border border-slate-600 px-3 py-2 text-sm hover:bg-slate-800">Refresh Contracts</button>
+            </div>
+
+            <div class="table-wrap rounded-lg border border-slate-700 mb-5">
+              <table class="w-full text-sm">
+                <thead class="bg-slate-900/95 text-slate-300">
+                  <tr>
+                    <th class="p-3 text-left">ID</th>
+                    <th class="p-3 text-left">Status</th>
+                    <th class="p-3 text-left">Maker</th>
+                    <th class="p-3 text-left">Taker</th>
+                    <th class="p-3 text-left">Amount</th>
+                    <th class="p-3 text-left">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="contractsTableBody" class="divide-y divide-slate-800"></tbody>
+              </table>
+            </div>
+
+            <div class="rounded-lg border border-slate-700 bg-slate-900/50 p-4">
+              <h3 class="text-lg font-semibold mb-3">Settle Market</h3>
+              <div class="grid grid-cols-1 gap-3 md:grid-cols-3">
+                <div>
+                  <label class="text-xs text-slate-400">Market ID</label>
+                  <input id="settleMarketIdInput" type="number" class="mt-1 w-full rounded-lg border border-slate-600 bg-slate-950 px-3 py-2 text-sm" />
+                </div>
+                <div>
+                  <label class="text-xs text-slate-400">Winning Outcome ID</label>
+                  <input id="settleWinningOutcomeInput" type="number" class="mt-1 w-full rounded-lg border border-slate-600 bg-slate-950 px-3 py-2 text-sm" />
+                </div>
+                <div class="flex items-end gap-2">
+                  <button id="settleMarketBtn" class="w-full rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold hover:bg-emerald-500">Settle Market</button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section id="usersTab" class="tab-panel panel rounded-xl p-4 md:p-5 hidden">
+            <div class="mb-4 flex items-center justify-between">
+              <h2 class="text-xl font-semibold">Users</h2>
+              <button id="refreshUsersBtn" class="rounded-lg border border-slate-600 px-3 py-2 text-sm hover:bg-slate-800">Refresh</button>
+            </div>
+
+            <div class="table-wrap rounded-lg border border-slate-700">
+              <table class="w-full text-sm">
+                <thead class="bg-slate-900/95 text-slate-300">
+                  <tr>
+                    <th class="p-3 text-left">ID</th>
+                    <th class="p-3 text-left">Username</th>
+                    <th class="p-3 text-left">Email</th>
+                    <th class="p-3 text-left">Available</th>
+                    <th class="p-3 text-left">Locked</th>
+                    <th class="p-3 text-left">Admin</th>
+                    <th class="p-3 text-left">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="usersTableBody" class="divide-y divide-slate-800"></tbody>
+              </table>
+            </div>
+          </section>
+        </main>
+      </div>
+    </div>
+  </div>
+
+  <div id="modalBackdrop" class="fixed inset-0 z-40 hidden bg-black/60 backdrop-blur-sm"></div>
+
+  <div id="createEventModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4">
+    <div class="w-full max-w-lg rounded-xl border border-slate-700 bg-slate-900 p-5">
+      <div class="mb-4 flex items-center justify-between">
+        <h3 class="text-lg font-semibold">Create Event</h3>
+        <button class="close-modal text-slate-400 hover:text-white" data-modal="createEventModal">✕</button>
+      </div>
+      <form id="createEventForm" class="space-y-3">
+        <div>
+          <label class="text-xs text-slate-400">Name</label>
+          <input name="name" required class="mt-1 w-full rounded-lg border border-slate-600 bg-slate-950 px-3 py-2 text-sm" />
+        </div>
+        <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+          <div>
+            <label class="text-xs text-slate-400">Team A</label>
+            <input name="team_a" required class="mt-1 w-full rounded-lg border border-slate-600 bg-slate-950 px-3 py-2 text-sm" />
+          </div>
+          <div>
+            <label class="text-xs text-slate-400">Team B</label>
+            <input name="team_b" required class="mt-1 w-full rounded-lg border border-slate-600 bg-slate-950 px-3 py-2 text-sm" />
+          </div>
+        </div>
+        <div>
+          <label class="text-xs text-slate-400">Scheduled At</label>
+          <input name="scheduled_at" type="datetime-local" required class="mt-1 w-full rounded-lg border border-slate-600 bg-slate-950 px-3 py-2 text-sm" />
+        </div>
+        <button id="createEventSubmitBtn" type="submit" class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold hover:bg-blue-500">Create</button>
+      </form>
+    </div>
+  </div>
+
+  <div id="createMarketModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4">
+    <div class="w-full max-w-lg rounded-xl border border-slate-700 bg-slate-900 p-5">
+      <div class="mb-4 flex items-center justify-between">
+        <h3 class="text-lg font-semibold">Create Market</h3>
+        <button class="close-modal text-slate-400 hover:text-white" data-modal="createMarketModal">✕</button>
+      </div>
+      <form id="createMarketForm" class="space-y-3">
+        <div>
+          <label class="text-xs text-slate-400">Name</label>
+          <input name="name" required class="mt-1 w-full rounded-lg border border-slate-600 bg-slate-950 px-3 py-2 text-sm" />
+        </div>
+        <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+          <div>
+            <label class="text-xs text-slate-400">Mode</label>
+            <select name="mode" class="mt-1 w-full rounded-lg border border-slate-600 bg-slate-950 px-3 py-2 text-sm">
+              <option value="P2P_DIRECT">P2P_DIRECT</option>
+              <option value="POOL_MARKET">POOL_MARKET</option>
+            </select>
+          </div>
+          <div>
+            <label class="text-xs text-slate-400">Event ID</label>
+            <input name="event_id" type="number" required class="mt-1 w-full rounded-lg border border-slate-600 bg-slate-950 px-3 py-2 text-sm" />
+          </div>
+        </div>
+        <div>
+          <label class="text-xs text-slate-400">Outcomes (comma separated, min 2)</label>
+          <input name="outcomes" required placeholder="Team A wins, Team B wins" class="mt-1 w-full rounded-lg border border-slate-600 bg-slate-950 px-3 py-2 text-sm" />
+        </div>
+        <button id="createMarketSubmitBtn" type="submit" class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold hover:bg-blue-500">Create</button>
+      </form>
+    </div>
+  </div>
+
+  <div id="resolveContractModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4">
+    <div class="w-full max-w-lg rounded-xl border border-slate-700 bg-slate-900 p-5">
+      <div class="mb-4 flex items-center justify-between">
+        <h3 class="text-lg font-semibold">Resolve Contract</h3>
+        <button class="close-modal text-slate-400 hover:text-white" data-modal="resolveContractModal">✕</button>
+      </div>
+      <form id="resolveContractForm" class="space-y-3">
+        <input id="resolveContractIdInput" type="hidden" />
+        <p class="text-sm text-slate-300">Contract ID: <span id="resolveContractLabel" class="font-semibold"></span></p>
+        <div>
+          <label class="text-xs text-slate-400">Winning Outcome ID</label>
+          <select id="resolveWinningOutcomeSelect" class="mt-1 w-full rounded-lg border border-slate-600 bg-slate-950 px-3 py-2 text-sm"></select>
+        </div>
+        <div class="flex gap-2">
+          <button id="resolveSubmitBtn" type="submit" class="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold hover:bg-emerald-500">Resolve</button>
+          <button id="resolveReloadOutcomesBtn" type="button" class="rounded-lg border border-slate-600 px-4 py-2 text-sm hover:bg-slate-800">Reload outcomes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="depositModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4">
+    <div class="w-full max-w-md rounded-xl border border-slate-700 bg-slate-900 p-5">
+      <div class="mb-4 flex items-center justify-between">
+        <h3 class="text-lg font-semibold">Deposit User Balance</h3>
+        <button class="close-modal text-slate-400 hover:text-white" data-modal="depositModal">✕</button>
+      </div>
+      <form id="depositForm" class="space-y-3">
+        <input id="depositUserIdInput" type="hidden" />
+        <p class="text-sm text-slate-300">User ID: <span id="depositUserLabel" class="font-semibold"></span></p>
+        <div>
+          <label class="text-xs text-slate-400">Amount</label>
+          <input id="depositAmountInput" type="number" min="0" step="0.01" required class="mt-1 w-full rounded-lg border border-slate-600 bg-slate-950 px-3 py-2 text-sm" />
+        </div>
+        <button id="depositSubmitBtn" type="submit" class="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold hover:bg-emerald-500">Deposit</button>
+      </form>
+    </div>
+  </div>
+
+  <div id="toastContainer" class="fixed bottom-4 right-4 z-[60] flex w-[320px] flex-col gap-2"></div>
+
+  <script>
+    const API_BASE = "http://localhost:3228";
+
+    let authToken = "";
+    let eventCache = [];
+    let contractCache = [];
+
+    const state = {
+      activeTab: "eventsTab",
+      marketsEventId: "",
+      buttonLoaders: new Map(),
+    };
+
+    function $(id) {
+      return document.getElementById(id);
+    }
+
+    function showToast(message, type = "success") {
+      const toast = document.createElement("div");
+      const palette = {
+        success: "bg-emerald-600/95 border-emerald-400",
+        error: "bg-red-600/95 border-red-400",
+        info: "bg-blue-600/95 border-blue-400",
+      };
+      toast.className = `rounded-lg border px-4 py-3 text-sm shadow-lg ${palette[type] || palette.info}`;
+      toast.textContent = message;
+      $("toastContainer").appendChild(toast);
+      setTimeout(() => {
+        toast.classList.add("opacity-0", "transition", "duration-500");
+      }, 2200);
+      setTimeout(() => {
+        toast.remove();
+      }, 2800);
+    }
+
+    function setButtonLoading(button, isLoading, loadingText = "Loading...") {
+      if (!button) return;
+      if (isLoading) {
+        if (!state.buttonLoaders.has(button)) {
+          state.buttonLoaders.set(button, button.textContent);
+        }
+        button.disabled = true;
+        button.classList.add("opacity-70", "cursor-not-allowed");
+        button.textContent = loadingText;
+      } else {
+        button.disabled = false;
+        button.classList.remove("opacity-70", "cursor-not-allowed");
+        const original = state.buttonLoaders.get(button);
+        if (original) {
+          button.textContent = original;
+        }
+        state.buttonLoaders.delete(button);
+      }
+    }
+
+    async function apiRequest(path, options = {}) {
+      const headers = {
+        "Content-Type": "application/json",
+        ...(options.headers || {}),
+      };
+
+      if (authToken) {
+        headers.Authorization = `Bearer ${authToken}`;
+      }
+
+      const response = await fetch(`${API_BASE}${path}`, {
+        ...options,
+        headers,
+      });
+
+      if (!response.ok) {
+        let errorMessage = `HTTP ${response.status}`;
+        try {
+          const payload = await response.json();
+          if (payload && payload.detail) {
+            errorMessage = typeof payload.detail === "string" ? payload.detail : JSON.stringify(payload.detail);
+          }
+        } catch (_) {
+          const text = await response.text();
+          if (text) errorMessage = text;
+        }
+        throw new Error(errorMessage);
+      }
+
+      if (response.status === 204) return null;
+
+      const text = await response.text();
+      return text ? JSON.parse(text) : null;
+    }
+
+    function openModal(modalId) {
+      $("modalBackdrop").classList.remove("hidden");
+      const modal = $(modalId);
+      modal.classList.remove("hidden");
+      modal.classList.add("flex");
+    }
+
+    function closeModal(modalId) {
+      const modal = $(modalId);
+      modal.classList.add("hidden");
+      modal.classList.remove("flex");
+      if (!["createEventModal", "createMarketModal", "resolveContractModal", "depositModal"].some((id) => !$(id).classList.contains("hidden"))) {
+        $("modalBackdrop").classList.add("hidden");
+      }
+    }
+
+    function closeAllModals() {
+      ["createEventModal", "createMarketModal", "resolveContractModal", "depositModal"].forEach(closeModal);
+      $("modalBackdrop").classList.add("hidden");
+    }
+
+    function initTabs() {
+      document.querySelectorAll(".tab-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const tabId = btn.dataset.tab;
+          state.activeTab = tabId;
+
+          document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
+          btn.classList.add("active");
+
+          document.querySelectorAll(".tab-panel").forEach((panel) => panel.classList.add("hidden"));
+          $(tabId).classList.remove("hidden");
+
+          if (tabId === "eventsTab") loadEvents();
+          if (tabId === "marketsTab") {
+            loadEventsForDropdown();
+            if (state.marketsEventId) loadMarkets(state.marketsEventId);
+          }
+          if (tabId === "settlementTab") loadContracts();
+          if (tabId === "usersTab") loadUsers();
+        });
+      });
+    }
+
+    function normalizeEventStatus(status) {
+      return String(status || "").toUpperCase();
+    }
+
+    function nextEventStatus(currentStatus) {
+      const map = {
+        SCHEDULED: "OPEN",
+        OPEN: "LIVE",
+        LIVE: "FINISHED",
+      };
+      return map[normalizeEventStatus(currentStatus)] || null;
+    }
+
+    function nextMarketStatus(currentStatus) {
+      const map = {
+        PENDING: "OPEN",
+        OPEN: "LOCKED",
+        LOCKED: "SETTLED",
+      };
+      return map[String(currentStatus || "").toUpperCase()] || null;
+    }
+
+    function renderTableRowEmpty(colspan, text) {
+      return `<tr><td colspan="${colspan}" class="p-4 text-center text-slate-400">${text}</td></tr>`;
+    }
+
+    async function loadEvents() {
+      const tbody = $("eventsTableBody");
+      tbody.innerHTML = renderTableRowEmpty(7, "Loading events...");
+      try {
+        const data = await apiRequest("/api/events");
+        const events = Array.isArray(data) ? data : (data?.events || []);
+        eventCache = events;
+
+        if (!events.length) {
+          tbody.innerHTML = renderTableRowEmpty(7, "No events found.");
+          return;
+        }
+
+        tbody.innerHTML = events.map((ev) => {
+          const id = ev.id ?? "-";
+          const name = ev.name || ev.title || `${ev.team_a || "-"} vs ${ev.team_b || "-"}`;
+          const teamA = ev.team_a || "-";
+          const teamB = ev.team_b || "-";
+          const status = ev.status || "-";
+          const scheduledAt = ev.scheduled_at || ev.scheduled_start || "-";
+          const next = nextEventStatus(status);
+
+          return `
+            <tr class="hover:bg-slate-800/40">
+              <td class="p-3">${id}</td>
+              <td class="p-3">${name}</td>
+              <td class="p-3">${teamA}</td>
+              <td class="p-3">${teamB}</td>
+              <td class="p-3">${status}</td>
+              <td class="p-3">${scheduledAt}</td>
+              <td class="p-3">
+                ${next ? `<button class="event-status-btn rounded border border-slate-600 px-2 py-1 text-xs hover:bg-slate-700" data-id="${id}" data-next="${next}">Set ${next}</button>` : "-"}
+              </td>
+            </tr>
+          `;
+        }).join("");
+
+        document.querySelectorAll(".event-status-btn").forEach((btn) => {
+          btn.addEventListener("click", async () => {
+            const id = btn.dataset.id;
+            const next = btn.dataset.next;
+            await patchEventStatus(id, next, btn);
+          });
+        });
+      } catch (error) {
+        tbody.innerHTML = renderTableRowEmpty(7, "Failed to load events.");
+        showToast(`Events load failed: ${error.message}`, "error");
+      }
+    }
+
+    async function patchEventStatus(eventId, status, buttonEl) {
+      setButtonLoading(buttonEl, true, "Updating...");
+      try {
+        await apiRequest(`/api/events/${eventId}`, {
+          method: "PATCH",
+          body: JSON.stringify({ status }),
+        });
+        showToast(`Event #${eventId} status updated to ${status}`);
+        await loadEvents();
+      } catch (error) {
+        showToast(`Event update failed: ${error.message}`, "error");
+      } finally {
+        setButtonLoading(buttonEl, false);
+      }
+    }
+
+    async function createEventFromForm(formData, submitBtn) {
+      const payload = {
+        name: formData.get("name"),
+        team_a: formData.get("team_a"),
+        team_b: formData.get("team_b"),
+        scheduled_at: formData.get("scheduled_at"),
+        scheduled_start: formData.get("scheduled_at"),
+        game_type: "ESPORTS",
+        tournament: "CyberDuel",
+      };
+
+      setButtonLoading(submitBtn, true, "Creating...");
+      try {
+        await apiRequest("/api/events", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        });
+        showToast("Event created successfully");
+        $("createEventForm").reset();
+        closeModal("createEventModal");
+        await loadEvents();
+      } catch (error) {
+        showToast(`Create event failed: ${error.message}`, "error");
+      } finally {
+        setButtonLoading(submitBtn, false);
+      }
+    }
+
+    async function loadEventsForDropdown() {
+      const select = $("marketEventFilter");
+      if (!eventCache.length) {
+        try {
+          const data = await apiRequest("/api/events");
+          eventCache = Array.isArray(data) ? data : (data?.events || []);
+        } catch (error) {
+          showToast(`Failed to load event list: ${error.message}`, "error");
+          return;
+        }
+      }
+
+      const options = ['<option value="">Select event id</option>'].concat(
+        eventCache.map((ev) => {
+          const label = `${ev.id} - ${ev.name || `${ev.team_a || "?"} vs ${ev.team_b || "?"}`}`;
+          return `<option value="${ev.id}">${label}</option>`;
+        })
+      );
+
+      select.innerHTML = options.join("");
+      if (state.marketsEventId) select.value = state.marketsEventId;
+    }
+
+    async function loadMarkets(eventId) {
+      state.marketsEventId = String(eventId || "");
+      const tbody = $("marketsTableBody");
+      if (!eventId) {
+        tbody.innerHTML = renderTableRowEmpty(5, "Select event id to load markets.");
+        return;
+      }
+
+      tbody.innerHTML = renderTableRowEmpty(5, "Loading markets...");
+      try {
+        const data = await apiRequest(`/api/markets?event_id=${encodeURIComponent(eventId)}`);
+        const markets = Array.isArray(data) ? data : (data?.markets || []);
+
+        if (!markets.length) {
+          tbody.innerHTML = renderTableRowEmpty(5, "No markets found for this event.");
+          return;
+        }
+
+        tbody.innerHTML = markets.map((m) => {
+          const id = m.id ?? "-";
+          const name = m.name || m.title || "-";
+          const mode = m.mode || m.market_mode || "-";
+          const status = m.status || "-";
+          const next = nextMarketStatus(status);
+
+          return `
+            <tr class="hover:bg-slate-800/40">
+              <td class="p-3">${id}</td>
+              <td class="p-3">${name}</td>
+              <td class="p-3">${mode}</td>
+              <td class="p-3">${status}</td>
+              <td class="p-3">
+                ${next ? `<button class="market-status-btn rounded border border-slate-600 px-2 py-1 text-xs hover:bg-slate-700" data-id="${id}" data-next="${next}">Set ${next}</button>` : "-"}
+              </td>
+            </tr>
+          `;
+        }).join("");
+
+        document.querySelectorAll(".market-status-btn").forEach((btn) => {
+          btn.addEventListener("click", async () => {
+            const id = btn.dataset.id;
+            const next = btn.dataset.next;
+            await patchMarketStatus(id, next, btn);
+          });
+        });
+      } catch (error) {
+        tbody.innerHTML = renderTableRowEmpty(5, "Failed to load markets.");
+        showToast(`Markets load failed: ${error.message}`, "error");
+      }
+    }
+
+    async function patchMarketStatus(marketId, status, buttonEl) {
+      setButtonLoading(buttonEl, true, "Updating...");
+      try {
+        await apiRequest(`/api/markets/${marketId}`, {
+          method: "PATCH",
+          body: JSON.stringify({ status }),
+        });
+        showToast(`Market #${marketId} status updated to ${status}`);
+        await loadMarkets(state.marketsEventId);
+      } catch (error) {
+        showToast(`Market update failed: ${error.message}`, "error");
+      } finally {
+        setButtonLoading(buttonEl, false);
+      }
+    }
+
+    async function createMarketFromForm(formData, submitBtn) {
+      const outcomesRaw = String(formData.get("outcomes") || "");
+      const outcomes = outcomesRaw
+        .split(",")
+        .map((o) => o.trim())
+        .filter(Boolean);
+
+      if (outcomes.length < 2) {
+        showToast("Please provide at least 2 outcomes.", "error");
+        return;
+      }
+
+      const mode = String(formData.get("mode") || "P2P_DIRECT");
+      const eventId = Number(formData.get("event_id"));
+      const name = String(formData.get("name") || "").trim();
+
+      const payload = {
+        name,
+        mode,
+        event_id: eventId,
+        outcomes: outcomes.map((label) => ({ name: label, external_id: null })),
+        title: name,
+        market_type: "MATCH_WINNER",
+        description: name,
+        market_mode: mode.toLowerCase(),
+      };
+
+      setButtonLoading(submitBtn, true, "Creating...");
+      try {
+        await apiRequest("/api/markets", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        });
+        showToast("Market created successfully");
+        $("createMarketForm").reset();
+        closeModal("createMarketModal");
+        $("marketEventFilter").value = String(eventId);
+        state.marketsEventId = String(eventId);
+        await loadMarkets(eventId);
+      } catch (error) {
+        showToast(`Create market failed: ${error.message}`, "error");
+      } finally {
+        setButtonLoading(submitBtn, false);
+      }
+    }
+
+    async function loadContracts() {
+      const tbody = $("contractsTableBody");
+      tbody.innerHTML = renderTableRowEmpty(6, "Loading contracts...");
+      try {
+        const data = await apiRequest("/api/settlement/contracts");
+        const contracts = Array.isArray(data) ? data : (data?.contracts || []);
+        contractCache = contracts;
+
+        if (!contracts.length) {
+          tbody.innerHTML = renderTableRowEmpty(6, "No contracts found.");
+          return;
+        }
+
+        tbody.innerHTML = contracts.map((c) => {
+          const id = c.id ?? "-";
+          const status = c.status || "-";
+          const maker = c.maker ?? c.maker_id ?? "-";
+          const taker = c.taker ?? c.taker_id ?? "-";
+          const amount = c.amount ?? "-";
+          const canResolve = ["CLAIMED", "DISPUTED"].includes(String(status).toUpperCase());
+
+          return `
+            <tr class="hover:bg-slate-800/40">
+              <td class="p-3">${id}</td>
+              <td class="p-3">${status}</td>
+              <td class="p-3">${maker}</td>
+              <td class="p-3">${taker}</td>
+              <td class="p-3">${amount}</td>
+              <td class="p-3">
+                ${canResolve ? `<button class="resolve-contract-btn rounded border border-emerald-500 px-2 py-1 text-xs text-emerald-300 hover:bg-emerald-900/40" data-id="${id}">Resolve</button>` : "-"}
+              </td>
+            </tr>
+          `;
+        }).join("");
+
+        document.querySelectorAll(".resolve-contract-btn").forEach((btn) => {
+          btn.addEventListener("click", () => openResolveModal(Number(btn.dataset.id)));
+        });
+      } catch (error) {
+        tbody.innerHTML = renderTableRowEmpty(6, "Failed to load contracts.");
+        showToast(`Contracts load failed: ${error.message}`, "error");
+      }
+    }
+
+    async function loadOutcomesForContract(contractId) {
+      const contract = contractCache.find((c) => Number(c.id) === Number(contractId));
+      const select = $("resolveWinningOutcomeSelect");
+      select.innerHTML = "";
+
+      if (!contract || !contract.market_id) {
+        select.innerHTML = '<option value="">No market info. Enter manually by editing DOM if needed.</option>';
+        return;
+      }
+
+      try {
+        const market = await apiRequest(`/api/markets/${contract.market_id}`);
+        const outcomes = market?.outcomes || [];
+        if (!outcomes.length) {
+          select.innerHTML = '<option value="">No outcomes found</option>';
+          return;
+        }
+        select.innerHTML = outcomes
+          .map((o) => `<option value="${o.id}">${o.id} - ${o.name || o.label || "Outcome"}</option>`)
+          .join("");
+      } catch (error) {
+        select.innerHTML = '<option value="">Failed to load outcomes</option>';
+        showToast(`Unable to fetch outcomes: ${error.message}`, "error");
+      }
+    }
+
+    async function openResolveModal(contractId) {
+      $("resolveContractIdInput").value = String(contractId);
+      $("resolveContractLabel").textContent = String(contractId);
+      openModal("resolveContractModal");
+      await loadOutcomesForContract(contractId);
+    }
+
+    async function resolveContract(contractId, winningOutcomeId, submitBtn) {
+      setButtonLoading(submitBtn, true, "Resolving...");
+      try {
+        await apiRequest(`/api/settlement/contracts/${contractId}/resolve`, {
+          method: "POST",
+          body: JSON.stringify({ winning_outcome_id: Number(winningOutcomeId) }),
+        });
+        showToast(`Contract #${contractId} resolved`);
+        closeModal("resolveContractModal");
+        await loadContracts();
+      } catch (error) {
+        showToast(`Resolve failed: ${error.message}`, "error");
+      } finally {
+        setButtonLoading(submitBtn, false);
+      }
+    }
+
+    async function settleMarket(marketId, winningOutcomeId, buttonEl) {
+      setButtonLoading(buttonEl, true, "Settling...");
+      try {
+        await apiRequest(`/api/settlement/markets/${marketId}/settle`, {
+          method: "POST",
+          body: JSON.stringify({ winning_outcome_id: Number(winningOutcomeId) }),
+        });
+        showToast(`Market #${marketId} settled successfully`);
+      } catch (error) {
+        showToast(`Market settlement failed: ${error.message}`, "error");
+      } finally {
+        setButtonLoading(buttonEl, false);
+      }
+    }
+
+    async function loadUsers() {
+      const tbody = $("usersTableBody");
+      tbody.innerHTML = renderTableRowEmpty(7, "Loading users...");
+      try {
+        const data = await apiRequest("/api/users");
+        const users = Array.isArray(data) ? data : (data?.users || []);
+
+        if (!users.length) {
+          tbody.innerHTML = renderTableRowEmpty(7, "No users found.");
+          return;
+        }
+
+        tbody.innerHTML = users.map((u) => {
+          const id = u.id ?? "-";
+          const username = u.username || u.name || "-";
+          const email = u.email || "-";
+          const available = u.balance_available ?? "0";
+          const locked = u.balance_locked ?? "0";
+          const isAdmin = typeof u.is_admin === "boolean" ? String(u.is_admin) : "-";
+
+          return `
+            <tr class="hover:bg-slate-800/40">
+              <td class="p-3">${id}</td>
+              <td class="p-3">${username}</td>
+              <td class="p-3">${email}</td>
+              <td class="p-3">${available}</td>
+              <td class="p-3">${locked}</td>
+              <td class="p-3">${isAdmin}</td>
+              <td class="p-3">
+                <button class="deposit-user-btn rounded border border-emerald-500 px-2 py-1 text-xs text-emerald-300 hover:bg-emerald-900/40" data-id="${id}">Deposit</button>
+              </td>
+            </tr>
+          `;
+        }).join("");
+
+        document.querySelectorAll(".deposit-user-btn").forEach((btn) => {
+          btn.addEventListener("click", () => openDepositModal(Number(btn.dataset.id)));
+        });
+      } catch (error) {
+        tbody.innerHTML = renderTableRowEmpty(7, "Failed to load users.");
+        showToast(`Users load failed: ${error.message}`, "error");
+      }
+    }
+
+    function openDepositModal(userId) {
+      $("depositUserIdInput").value = String(userId);
+      $("depositUserLabel").textContent = String(userId);
+      $("depositAmountInput").value = "";
+      openModal("depositModal");
+    }
+
+    async function depositToUser(userId, amount, buttonEl) {
+      setButtonLoading(buttonEl, true, "Depositing...");
+      try {
+        await apiRequest(`/api/admin/users/${userId}/deposit`, {
+          method: "POST",
+          body: JSON.stringify({ amount: Number(amount) }),
+        });
+        showToast(`Deposit successful for user #${userId}`);
+        closeModal("depositModal");
+        await loadUsers();
+      } catch (error) {
+        showToast(`Deposit failed: ${error.message}`, "error");
+      } finally {
+        setButtonLoading(buttonEl, false);
+      }
+    }
+
+    function bindUI() {
+      $("applyTokenBtn").addEventListener("click", () => {
+        authToken = $("tokenInput").value.trim();
+        showToast(authToken ? "Token applied" : "Token cleared", "info");
+      });
+
+      $("tokenInput").addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          authToken = $("tokenInput").value.trim();
+          showToast(authToken ? "Token applied" : "Token cleared", "info");
+        }
+      });
+
+      $("refreshEventsBtn").addEventListener("click", loadEvents);
+      $("openCreateEventModalBtn").addEventListener("click", () => openModal("createEventModal"));
+      $("createEventForm").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        await createEventFromForm(new FormData(e.target), $("createEventSubmitBtn"));
+      });
+
+      $("loadMarketsBtn").addEventListener("click", () => {
+        const eventId = $("marketEventFilter").value;
+        loadMarkets(eventId);
+      });
+      $("marketEventFilter").addEventListener("change", () => {
+        const eventId = $("marketEventFilter").value;
+        loadMarkets(eventId);
+      });
+      $("openCreateMarketModalBtn").addEventListener("click", () => {
+        const selectedEvent = $("marketEventFilter").value;
+        const eventIdField = document.querySelector('#createMarketForm input[name="event_id"]');
+        if (selectedEvent && eventIdField) eventIdField.value = selectedEvent;
+        openModal("createMarketModal");
+      });
+      $("createMarketForm").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        await createMarketFromForm(new FormData(e.target), $("createMarketSubmitBtn"));
+      });
+
+      $("refreshContractsBtn").addEventListener("click", loadContracts);
+      $("resolveContractForm").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const contractId = Number($("resolveContractIdInput").value);
+        const winningOutcomeId = Number($("resolveWinningOutcomeSelect").value);
+        if (!winningOutcomeId) {
+          showToast("Select winning outcome", "error");
+          return;
+        }
+        await resolveContract(contractId, winningOutcomeId, $("resolveSubmitBtn"));
+      });
+      $("resolveReloadOutcomesBtn").addEventListener("click", async () => {
+        const contractId = Number($("resolveContractIdInput").value);
+        if (contractId) await loadOutcomesForContract(contractId);
+      });
+
+      $("settleMarketBtn").addEventListener("click", async () => {
+        const marketId = Number($("settleMarketIdInput").value);
+        const winningOutcomeId = Number($("settleWinningOutcomeInput").value);
+        if (!marketId || !winningOutcomeId) {
+          showToast("Provide market_id and winning_outcome_id", "error");
+          return;
+        }
+        await settleMarket(marketId, winningOutcomeId, $("settleMarketBtn"));
+      });
+
+      $("refreshUsersBtn").addEventListener("click", loadUsers);
+      $("depositForm").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const userId = Number($("depositUserIdInput").value);
+        const amount = Number($("depositAmountInput").value);
+        if (!amount || amount <= 0) {
+          showToast("Amount must be greater than 0", "error");
+          return;
+        }
+        await depositToUser(userId, amount, $("depositSubmitBtn"));
+      });
+
+      document.querySelectorAll(".close-modal").forEach((btn) => {
+        btn.addEventListener("click", () => closeModal(btn.dataset.modal));
+      });
+
+      $("modalBackdrop").addEventListener("click", closeAllModals);
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") closeAllModals();
+      });
+    }
+
+    async function bootstrap() {
+      initTabs();
+      bindUI();
+      await loadEvents();
+      await loadEventsForDropdown();
+    }
+
+    bootstrap();
+  </script>
+</body>
+</html>
