@@ -10,6 +10,8 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
 from datetime import datetime, timezone
 from decimal import Decimal
 
@@ -100,6 +102,32 @@ POOL_BETS: list[list[tuple]] = [
         (1, 1,  "50"),
     ],
 ]
+
+
+def export_seed_credentials(output_path: str | None = None) -> str:
+    """Export seed credentials into a simple text file for quick manual testing."""
+    if output_path is None:
+        output_path = os.path.join(PROJECT_ROOT, "data", "seed_credentials.txt")
+
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+
+    lines = [
+        "CyberDuel seed credentials (dev only)",
+        "",
+        "API: http://localhost:3228",
+        "Admin page: http://localhost:5173/admin.html",
+        "",
+        "Users:",
+    ]
+
+    for user in USERS:
+        role = "admin" if user.get("is_admin", False) else "user"
+        lines.append(f"- {user['email']} | {user['password']} | {role}")
+
+    with open(output_path, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines) + "\n")
+
+    return output_path
 
 
 # ---------------------------------------------------------------------------
@@ -316,12 +344,15 @@ def seed() -> None:
         db.close()
 
     # ── Summary ───────────────────────────────────────────────────────────
+    creds_path = export_seed_credentials()
+
     print("\n✅  Seed complete!")
     print(f"    Users created    : {stats['users']}")
     print(f"    Events created   : {stats['events']}")
     print(f"    Markets created  : {stats['markets']}")
     print(f"    Orders created   : {stats['orders']}")
     print(f"    Pool bets created: {stats['bets']}")
+    print(f"    Credentials file : {creds_path}")
 
 
 def reset_db() -> None:

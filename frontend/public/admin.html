@@ -44,7 +44,15 @@
             <h1 class="text-2xl font-bold tracking-wide">CyberDuel Admin Console</h1>
             <p class="text-slate-400 text-sm mt-1">Static admin page powered by vanilla JavaScript.</p>
           </div>
-          <div class="w-full md:w-[620px]">
+          <div class="w-full md:w-[760px]">
+            <form id="adminLoginForm" class="mb-3 rounded-lg border border-slate-700 bg-slate-900/50 p-3">
+              <div class="mb-2 text-xs uppercase tracking-wide text-slate-400">Quick Admin Login</div>
+              <div class="grid grid-cols-1 gap-2 md:grid-cols-[1fr_1fr_auto]">
+                <input id="loginEmailInput" type="email" placeholder="admin@email.com" class="w-full rounded-lg border border-slate-600 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 focus:border-blue-400 focus:outline-none" required />
+                <input id="loginPasswordInput" type="password" placeholder="password" class="w-full rounded-lg border border-slate-600 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 focus:border-blue-400 focus:outline-none" required />
+                <button id="adminLoginBtn" type="submit" class="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold hover:bg-emerald-500">Login</button>
+              </div>
+            </form>
             <label for="tokenInput" class="block text-sm text-slate-300 mb-1">Admin JWT Token (Bearer)</label>
             <div class="flex gap-2">
               <input id="tokenInput" type="text" placeholder="Paste JWT token here" class="w-full rounded-lg border border-slate-600 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 focus:border-blue-400 focus:outline-none" />
@@ -144,6 +152,27 @@
 
             <div class="rounded-lg border border-slate-700 bg-slate-900/50 p-4">
               <h3 class="text-lg font-semibold mb-3">Settle Market</h3>
+              <p class="mb-3 text-xs text-slate-400">Step by step: pick event, then market, then winning outcome. IDs are auto-filled below.</p>
+              <div class="mb-3 grid grid-cols-1 gap-3 md:grid-cols-3">
+                <div>
+                  <label class="text-xs text-slate-400">Event</label>
+                  <select id="settleEventSelect" class="mt-1 w-full rounded-lg border border-slate-600 bg-slate-950 px-3 py-2 text-sm">
+                    <option value="">Select event</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="text-xs text-slate-400">Market</label>
+                  <select id="settleMarketSelect" class="mt-1 w-full rounded-lg border border-slate-600 bg-slate-950 px-3 py-2 text-sm" disabled>
+                    <option value="">Select market</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="text-xs text-slate-400">Winning outcome</label>
+                  <select id="settleOutcomeSelect" class="mt-1 w-full rounded-lg border border-slate-600 bg-slate-950 px-3 py-2 text-sm" disabled>
+                    <option value="">Select outcome</option>
+                  </select>
+                </div>
+              </div>
               <div class="grid grid-cols-1 gap-3 md:grid-cols-3">
                 <div>
                   <label class="text-xs text-slate-400">Market ID</label>
@@ -298,8 +327,10 @@
     const API_BASE = "http://localhost:3228";
 
     let authToken = "";
+    let refreshToken = "";
     let eventCache = [];
     let contractCache = [];
+    let settlementMarketCache = [];
 
     const state = {
       activeTab: "eventsTab",
@@ -382,6 +413,46 @@
 
       const text = await response.text();
       return text ? JSON.parse(text) : null;
+    }
+
+    async function loginAndApplyToken(buttonEl) {
+      const email = $("loginEmailInput").value.trim();
+      const password = $("loginPasswordInput").value;
+
+      if (!email || !password) {
+        showToast("Provide email and password", "error");
+        return;
+      }
+
+      setButtonLoading(buttonEl, true, "Logging in...");
+      try {
+        const data = await apiRequest("/auth/login", {
+          method: "POST",
+          body: JSON.stringify({ email, password }),
+        });
+
+        authToken = data?.access_token || "";
+        refreshToken = data?.refresh_token || "";
+        $("tokenInput").value = authToken;
+
+        if (!authToken) {
+          throw new Error("No access token returned by backend");
+        }
+
+        showToast("Login successful. JWT applied.", "success");
+
+        if (state.activeTab === "eventsTab") await loadEvents();
+        if (state.activeTab === "marketsTab") {
+          await loadEventsForDropdown();
+          if (state.marketsEventId) await loadMarkets(state.marketsEventId);
+        }
+        if (state.activeTab === "settlementTab") await loadContracts();
+        if (state.activeTab === "usersTab") await loadUsers();
+      } catch (error) {
+        showToast(`Login failed: ${error.message}`, "error");
+      } finally {
+        setButtonLoading(buttonEl, false);
+      }
     }
 
     function openModal(modalId) {
@@ -571,6 +642,100 @@
       if (state.marketsEventId) select.value = state.marketsEventId;
     }
 
+    async function loadSettlementEvents() {
+      const select = $("settleEventSelect");
+
+      if (!eventCache.length) {
+        try {
+          const data = await apiRequest("/api/events");
+          eventCache = Array.isArray(data) ? data : (data?.events || []);
+        } catch (error) {
+          showToast(`Failed to load events for settlement: ${error.message}`, "error");
+          return;
+        }
+      }
+
+      const options = ['<option value="">Select event</option>'].concat(
+        eventCache.map((ev) => {
+          const label = `${ev.id} - ${ev.team_a || "?"} vs ${ev.team_b || "?"}`;
+          return `<option value="${ev.id}">${label}</option>`;
+        })
+      );
+      select.innerHTML = options.join("");
+    }
+
+    async function loadSettlementMarkets(eventId) {
+      const marketSelect = $("settleMarketSelect");
+      const outcomeSelect = $("settleOutcomeSelect");
+
+      $("settleMarketIdInput").value = "";
+      $("settleWinningOutcomeInput").value = "";
+      outcomeSelect.innerHTML = '<option value="">Select outcome</option>';
+      outcomeSelect.disabled = true;
+
+      if (!eventId) {
+        marketSelect.innerHTML = '<option value="">Select market</option>';
+        marketSelect.disabled = true;
+        settlementMarketCache = [];
+        return;
+      }
+
+      marketSelect.disabled = true;
+      marketSelect.innerHTML = '<option value="">Loading markets...</option>';
+
+      try {
+        const data = await apiRequest(`/api/markets?event_id=${encodeURIComponent(eventId)}`);
+        const markets = Array.isArray(data) ? data : (data?.markets || []);
+        settlementMarketCache = markets;
+
+        if (!markets.length) {
+          marketSelect.innerHTML = '<option value="">No markets for this event</option>';
+          return;
+        }
+
+        marketSelect.innerHTML = ['<option value="">Select market</option>']
+          .concat(markets.map((m) => {
+            const title = m.title || m.name || "Market";
+            const mode = m.market_mode || m.mode || "-";
+            const status = m.status || "-";
+            return `<option value="${m.id}">${m.id} - ${title} [${mode}] (${status})</option>`;
+          }))
+          .join("");
+      } catch (error) {
+        marketSelect.innerHTML = '<option value="">Failed to load markets</option>';
+        showToast(`Settlement markets load failed: ${error.message}`, "error");
+      } finally {
+        marketSelect.disabled = false;
+      }
+    }
+
+    function loadSettlementOutcomes(marketId) {
+      const outcomeSelect = $("settleOutcomeSelect");
+      $("settleWinningOutcomeInput").value = "";
+
+      if (!marketId) {
+        outcomeSelect.innerHTML = '<option value="">Select outcome</option>';
+        outcomeSelect.disabled = true;
+        $("settleMarketIdInput").value = "";
+        return;
+      }
+
+      const market = settlementMarketCache.find((m) => Number(m.id) === Number(marketId));
+      $("settleMarketIdInput").value = String(marketId);
+
+      const outcomes = market?.outcomes || [];
+      if (!outcomes.length) {
+        outcomeSelect.innerHTML = '<option value="">No outcomes in selected market</option>';
+        outcomeSelect.disabled = true;
+        return;
+      }
+
+      outcomeSelect.innerHTML = ['<option value="">Select outcome</option>']
+        .concat(outcomes.map((o) => `<option value="${o.id}">${o.id} - ${o.name || "Outcome"}</option>`))
+        .join("");
+      outcomeSelect.disabled = false;
+    }
+
     async function loadMarkets(eventId) {
       state.marketsEventId = String(eventId || "");
       const tbody = $("marketsTableBody");
@@ -688,8 +853,23 @@
       const tbody = $("contractsTableBody");
       tbody.innerHTML = renderTableRowEmpty(6, "Loading contracts...");
       try {
-        const data = await apiRequest("/api/settlement/contracts");
-        const contracts = Array.isArray(data) ? data : (data?.contracts || []);
+        const [disputesRes, pendingRes] = await Promise.allSettled([
+          apiRequest("/api/admin/disputes"),
+          apiRequest("/api/settlement/contracts/pending-claims"),
+        ]);
+
+        const disputes = disputesRes.status === "fulfilled"
+          ? (Array.isArray(disputesRes.value) ? disputesRes.value : (disputesRes.value?.contracts || []))
+          : [];
+        const pendingClaims = pendingRes.status === "fulfilled"
+          ? (Array.isArray(pendingRes.value) ? pendingRes.value : (pendingRes.value?.contracts || []))
+          : [];
+
+        const byId = new Map();
+        [...disputes, ...pendingClaims].forEach((c) => {
+          if (c && c.id != null) byId.set(Number(c.id), c);
+        });
+        const contracts = Array.from(byId.values());
         contractCache = contracts;
 
         if (!contracts.length) {
@@ -764,9 +944,12 @@
     async function resolveContract(contractId, winningOutcomeId, submitBtn) {
       setButtonLoading(submitBtn, true, "Resolving...");
       try {
-        await apiRequest(`/api/settlement/contracts/${contractId}/resolve`, {
+        await apiRequest(`/api/admin/disputes/${contractId}/resolve`, {
           method: "POST",
-          body: JSON.stringify({ winning_outcome_id: Number(winningOutcomeId) }),
+          body: JSON.stringify({
+            winning_outcome_id: Number(winningOutcomeId),
+            resolution_notes: "Resolved from admin page",
+          }),
         });
         showToast(`Contract #${contractId} resolved`);
         closeModal("resolveContractModal");
@@ -781,9 +964,16 @@
     async function settleMarket(marketId, winningOutcomeId, buttonEl) {
       setButtonLoading(buttonEl, true, "Settling...");
       try {
-        await apiRequest(`/api/settlement/markets/${marketId}/settle`, {
+        await apiRequest(`/api/markets/${marketId}`, {
+          method: "PATCH",
+          body: JSON.stringify({
+            winning_outcome_id: Number(winningOutcomeId),
+            status: "SETTLED",
+          }),
+        });
+
+        await apiRequest(`/api/admin/markets/${marketId}/settle`, {
           method: "POST",
-          body: JSON.stringify({ winning_outcome_id: Number(winningOutcomeId) }),
         });
         showToast(`Market #${marketId} settled successfully`);
       } catch (error) {
@@ -797,8 +987,9 @@
       const tbody = $("usersTableBody");
       tbody.innerHTML = renderTableRowEmpty(7, "Loading users...");
       try {
-        const data = await apiRequest("/api/users");
-        const users = Array.isArray(data) ? data : (data?.users || []);
+        const me = await apiRequest("/auth/me");
+        const users = me ? [me] : [];
+        showToast("Showing current user profile (global users endpoint is not implemented in backend).", "info");
 
         if (!users.length) {
           tbody.innerHTML = renderTableRowEmpty(7, "No users found.");
@@ -822,15 +1013,11 @@
               <td class="p-3">${locked}</td>
               <td class="p-3">${isAdmin}</td>
               <td class="p-3">
-                <button class="deposit-user-btn rounded border border-emerald-500 px-2 py-1 text-xs text-emerald-300 hover:bg-emerald-900/40" data-id="${id}">Deposit</button>
+                <span class="text-xs text-slate-400">N/A</span>
               </td>
             </tr>
           `;
         }).join("");
-
-        document.querySelectorAll(".deposit-user-btn").forEach((btn) => {
-          btn.addEventListener("click", () => openDepositModal(Number(btn.dataset.id)));
-        });
       } catch (error) {
         tbody.innerHTML = renderTableRowEmpty(7, "Failed to load users.");
         showToast(`Users load failed: ${error.message}`, "error");
@@ -855,13 +1042,18 @@
         closeModal("depositModal");
         await loadUsers();
       } catch (error) {
-        showToast(`Deposit failed: ${error.message}`, "error");
+        showToast(`Deposit endpoint is not available in backend: ${error.message}`, "error");
       } finally {
         setButtonLoading(buttonEl, false);
       }
     }
 
     function bindUI() {
+      $("adminLoginForm").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        await loginAndApplyToken($("adminLoginBtn"));
+      });
+
       $("applyTokenBtn").addEventListener("click", () => {
         authToken = $("tokenInput").value.trim();
         showToast(authToken ? "Token applied" : "Token cleared", "info");
@@ -902,6 +1094,15 @@
       });
 
       $("refreshContractsBtn").addEventListener("click", loadContracts);
+      $("settleEventSelect").addEventListener("change", async () => {
+        await loadSettlementMarkets($("settleEventSelect").value);
+      });
+      $("settleMarketSelect").addEventListener("change", () => {
+        loadSettlementOutcomes($("settleMarketSelect").value);
+      });
+      $("settleOutcomeSelect").addEventListener("change", () => {
+        $("settleWinningOutcomeInput").value = $("settleOutcomeSelect").value || "";
+      });
       $("resolveContractForm").addEventListener("submit", async (e) => {
         e.preventDefault();
         const contractId = Number($("resolveContractIdInput").value);
@@ -954,6 +1155,7 @@
       bindUI();
       await loadEvents();
       await loadEventsForDropdown();
+      await loadSettlementEvents();
     }
 
     bootstrap();

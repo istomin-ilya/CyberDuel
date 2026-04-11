@@ -47,6 +47,37 @@ Notes:
 - Frontend container uses Nginx reverse proxy for /api to backend.
 - Backend container runs migrations on startup via backend/start.sh.
 
+## Quick Guide (Working Features)
+
+1. Start:
+
+```bash
+docker compose up --build
+```
+
+2. On backend startup:
+- migrations are applied
+- seed is executed
+- seed credentials are written to the `data` folder
+
+3. Useful URLs:
+- Main frontend: http://localhost:5173
+- Admin page: http://localhost:5173/admin.html
+- API docs: http://localhost:3228/docs
+
+4. Admin access:
+- use Quick Admin Login on `admin.html`
+
+5. Stable now:
+- Events: create + status transitions
+- Markets: create + status transitions
+- Settlement: dispute resolve + market settle
+- Auth: login/refresh/me
+
+6. Current limitations:
+- global `/api/users` endpoint is not implemented
+- users deposit action is disabled in admin UI (backend endpoint is missing)
+
 ## Local Development (Without Docker)
 
 ## Prerequisites

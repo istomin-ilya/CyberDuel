@@ -11,7 +11,6 @@ COPY . .
 
 RUN mkdir -p /app/data
 
-COPY start.sh .
-RUN chmod +x start.sh
+RUN sed -i 's/\r$//' start.sh && chmod +x start.sh
 
-CMD ["./start.sh"]
+CMD ["sh", "./start.sh"]
