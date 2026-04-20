@@ -23,6 +23,9 @@ from app.models import (
 from app.services.auth import AuthService
 
 
+DEFAULT_STARTING_BALANCE = Decimal("5000.00")
+
+
 # ---------------------------------------------------------------------------
 # Data definitions
 # ---------------------------------------------------------------------------
@@ -143,7 +146,7 @@ def _get_or_create_user(db, spec: dict) -> tuple["User", bool]:
     user = User(
         email=spec["email"],
         password_hash=AuthService.hash_password(spec["password"]),
-        balance_available=Decimal("1000.00"),
+        balance_available=DEFAULT_STARTING_BALANCE,
         balance_locked=Decimal("0.00"),
         is_admin=spec.get("is_admin", False),
     )

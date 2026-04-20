@@ -25,13 +25,7 @@ P2P + Pool prediction market protocol for esports outcomes.
 
 ## Quick Start (Docker, Recommended)
 
-1. Create env file in repo root:
-
-```bash
-cp .env.example .env
-```
-
-2. Start stack:
+1. Start stack:
 
 ```bash
 docker compose up --build
@@ -42,6 +36,10 @@ docker compose up --build
 - Frontend: http://localhost:5173
 - Backend API: http://localhost:3228
 - API docs: http://localhost:3228/docs
+
+## Demo
+
+- Docker-only demo script: DEMO_RUNBOOK_EN.md
 
 Notes:
 - Frontend container uses Nginx reverse proxy for /api to backend.

@@ -7,9 +7,13 @@ services:
       - ./backend/data:/app/data
     environment:
       - DATABASE_URL=sqlite:///./data/cyberduel.db
+      - DEBUG=false
       - SECRET_KEY=cyberduel-dev-secret-key
+      - JWT_SECRET=cyberduel-dev-jwt-secret
+      - JWT_ALGORITHM=HS256
       - ORACLE_PROVIDER=mock
       - CORS_ORIGINS=["http://localhost:5173","http://localhost:80"]
+      - SEED_RESET_ON_START=true
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3228/health"]
       interval: 10s
